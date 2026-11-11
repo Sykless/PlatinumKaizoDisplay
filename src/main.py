@@ -4,6 +4,7 @@ import conf
 import file
 import parse
 import party
+import trainer
 
 PARTY_LABEL = "party"
 BOX_LABEL = "box"
@@ -50,13 +51,17 @@ def mainLoop():
                     elif line.startswith("PARTY"):
                         partyLine = parse.parseLine(line)
 
+                    elif line.startswith("TRAINERS"):
+                        defeatedTrainers = parse.parseLine(line)
+
                 # Create png images from parsed data
                 party.generatePlayerPartyImage(PARTY_LABEL, partyLine, 6, 1)
                 party.generatePlayerPartyImage(BOX_LABEL, boxLine, 6, 5)
                 party.generatePlayerPartyImage(DEAD_LABEL, deadLine, columnNumber, rowNumber, customSize = True)
+                trainer.processDefeatedTrainers(defeatedTrainers, 0)
 
             # Every 5 seconds by default, customizable
-            boxClock = (boxClock + 1) % boxDisplayTime 
+            boxClock = (boxClock + 1) % boxDisplayTime
         
         # Don't stop script if an error occurs, just print it in the logs
         except Exception as e:
