@@ -6,19 +6,16 @@
 local lastFrame = emu.framecount()
 local FRAMES_PER_SECOND = 60
 
+function getHexValue(intValue)
+    return string.format("%x", intValue)
+end
+
 --------------------------------------------------------------
 -- For debug purposes, OBVIOUSLY don't use on official runs --
 --------------------------------------------------------------
 local ENABLE_DEBUG_CHEATS = true
-
-local BASE_ADDRESS = memory.read_u32_le(0x02101D2C)
-local PARTY_ADDRESS = BASE_ADDRESS + 0xD094
-local BATTLE_ADDRESS = BASE_ADDRESS + 0x5888C
-local PC_ADDRESS = memory.read_u32_le(0x021C0794) + 0x14 + 0xCF2C + 0x4
 local PARTY_POKEMON_SIZE = 0xEC
 local BOX_POKEMON_SIZE = 0x88
-local TRAINERS_START = BASE_ADDRESS + 0xD076
-local TRAINER_END = BASE_ADDRESS + 0xE1E0
 
 local SPECIES_NAMES = {"Bulbasaur", "Ivysaur", "Venusaur", "Charmander", "Charmeleon", "Charizard", "Squirtle", "Wartortle", "Blastoise", "Caterpie", "Metapod", "Butterfree", "Weedle", "Kakuna", "Beedrill", "Pidgey", "Pidgeotto", "Pidgeot", "Rattata", "Raticate", "Spearow", "Fearow", "Ekans", "Arbok", "Pikachu", "Raichu", "Sandshrew", "Sandslash", "Nidoran-F", "Nidorina", "Nidoqueen", "Nidoran-M", "Nidorino", "Nidoking", "Clefairy", "Clefable", "Vulpix", "Ninetales", "Jigglypuff", "Wigglytuff", "Zubat", "Golbat", "Oddish", "Gloom", "Vileplume", "Paras", "Parasect", "Venonat", "Venomoth", "Diglett", "Dugtrio", "Meowth", "Persian", "Psyduck", "Golduck", "Mankey", "Primeape", "Growlithe", "Arcanine", "Poliwag", "Poliwhirl", "Poliwrath", "Abra", "Kadabra", "Alakazam", "Machop", "Machoke", "Machamp", "Bellsprout", "Weepinbell", "Victreebel", "Tentacool", "Tentacruel", "Geodude", "Graveler", "Golem", "Ponyta", "Rapidash", "Slowpoke", "Slowbro", "Magnemite", "Magneton", "Farfetch’d", "Doduo", "Dodrio", "Seel", "Dewgong", "Grimer", "Muk", "Shellder", "Cloyster", "Gastly", "Haunter", "Gengar", "Onix", "Drowzee", "Hypno", "Krabby", "Kingler", "Voltorb", "Electrode", "Exeggcute", "Exeggutor", "Cubone", "Marowak", "Hitmonlee", "Hitmonchan", "Lickitung", "Koffing", "Weezing", "Rhyhorn", "Rhydon", "Chansey", "Tangela", "Kangaskhan", "Horsea", "Seadra", "Goldeen", "Seaking", "Staryu", "Starmie", "Mr. Mime", "Scyther", "Jynx", "Electabuzz", "Magmar", "Pinsir", "Tauros", "Magikarp", "Gyarados", "Lapras", "Ditto", "Eevee", "Vaporeon", "Jolteon", "Flareon", "Porygon", "Omanyte", "Omastar", "Kabuto", "Kabutops", "Aerodactyl", "Snorlax", "Articuno", "Zapdos", "Moltres", "Dratini", "Dragonair", "Dragonite", "Mewtwo", "Mew", "Chikorita", "Bayleef", "Meganium", "Cyndaquil", "Quilava", "Typhlosion", "Totodile", "Croconaw", "Feraligatr", "Sentret", "Furret", "Hoothoot", "Noctowl", "Ledyba", "Ledian", "Spinarak", "Ariados", "Crobat", "Chinchou", "Lanturn", "Pichu", "Cleffa", "Igglybuff", "Togepi", "Togetic", "Natu", "Xatu", "Mareep", "Flaaffy", "Ampharos", "Bellossom", "Marill", "Azumarill", "Sudowoodo", "Politoed", "Hoppip", "Skiploom", "Jumpluff", "Aipom", "Sunkern", "Sunflora", "Yanma", "Wooper", "Quagsire", "Espeon", "Umbreon", "Murkrow", "Slowking", "Misdreavus", "Unown", "Wobbuffet", "Girafarig", "Pineco", "Forretress", "Dunsparce", "Gligar", "Steelix", "Snubbull", "Granbull", "Qwilfish", "Scizor", "Shuckle", "Heracross", "Sneasel", "Teddiursa", "Ursaring", "Slugma", "Magcargo", "Swinub", "Piloswine", "Corsola", "Remoraid", "Octillery", "Delibird", "Mantine", "Skarmory", "Houndour", "Houndoom", "Kingdra", "Phanpy", "Donphan", "Porygon2", "Stantler", "Smeargle", "Tyrogue", "Hitmontop", "Smoochum", "Elekid", "Magby", "Miltank", "Blissey", "Raikou", "Entei", "Suicune", "Larvitar", "Pupitar", "Tyranitar", "Lugia", "Ho-Oh", "Celebi", "Treecko", "Grovyle", "Sceptile", "Torchic", "Combusken", "Blaziken", "Mudkip", "Marshtomp", "Swampert", "Poochyena", "Mightyena", "Zigzagoon", "Linoone", "Wurmple", "Silcoon", "Beautifly", "Cascoon", "Dustox", "Lotad", "Lombre", "Ludicolo", "Seedot", "Nuzleaf", "Shiftry", "Taillow", "Swellow", "Wingull", "Pelipper", "Ralts", "Kirlia", "Gardevoir", "Surskit", "Masquerain", "Shroomish", "Breloom", "Slakoth", "Vigoroth", "Slaking", "Nincada", "Ninjask", "Shedinja", "Whismur", "Loudred", "Exploud", "Makuhita", "Hariyama", "Azurill", "Nosepass", "Skitty", "Delcatty", "Sableye", "Mawile", "Aron", "Lairon", "Aggron", "Meditite", "Medicham", "Electrike", "Manectric", "Plusle", "Minun", "Volbeat", "Illumise", "Roselia", "Gulpin", "Swalot", "Carvanha", "Sharpedo", "Wailmer", "Wailord", "Numel", "Camerupt", "Torkoal", "Spoink", "Grumpig", "Spinda", "Trapinch", "Vibrava", "Flygon", "Cacnea", "Cacturne", "Swablu", "Altaria", "Zangoose", "Seviper", "Lunatone", "Solrock", "Barboach", "Whiscash", "Corphish", "Crawdaunt", "Baltoy", "Claydol", "Lileep", "Cradily", "Anorith", "Armaldo", "Feebas", "Milotic", "Castform", "Kecleon", "Shuppet", "Banette", "Duskull", "Dusclops", "Tropius", "Chimecho", "Absol", "Wynaut", "Snorunt", "Glalie", "Spheal", "Sealeo", "Walrein", "Clamperl", "Huntail", "Gorebyss", "Relicanth", "Luvdisc", "Bagon", "Shelgon", "Salamence", "Beldum", "Metang", "Metagross", "Regirock", "Regice", "Registeel", "Latias", "Latios", "Kyogre", "Groudon", "Rayquaza", "Jirachi", "Deoxys", "Turtwig", "Grotle", "Torterra", "Chimchar", "Monferno", "Infernape", "Piplup", "Prinplup", "Empoleon", "Starly", "Staravia", "Staraptor", "Bidoof", "Bibarel", "Kricketot", "Kricketune", "Shinx", "Luxio", "Luxray", "Budew", "Roserade", "Cranidos", "Rampardos", "Shieldon", "Bastiodon", "Burmy", "Wormadam", "Mothim", "Combee", "Vespiquen", "Pachirisu", "Buizel", "Floatzel", "Cherubi", "Cherrim", "Shellos", "Gastrodon", "Ambipom", "Drifloon", "Drifblim", "Buneary", "Lopunny", "Mismagius", "Honchkrow", "Glameow", "Purugly", "Chingling", "Stunky", "Skuntank", "Bronzor", "Bronzong", "Bonsly", "Mime Jr.", "Happiny", "Chatot", "Spiritomb", "Gible", "Gabite", "Garchomp", "Munchlax", "Riolu", "Lucario", "Hippopotas", "Hippowdon", "Skorupi", "Drapion", "Croagunk", "Toxicroak", "Carnivine", "Finneon", "Lumineon", "Mantyke", "Snover", "Abomasnow", "Weavile", "Magnezone", "Lickilicky", "Rhyperior", "Tangrowth", "Electivire", "Magmortar", "Togekiss", "Yanmega", "Leafeon", "Glaceon", "Gliscor", "Mamoswine", "Porygon-Z", "Gallade", "Probopass", "Dusknoir", "Froslass", "Rotom", "Uxie", "Mesprit", "Azelf", "Dialga", "Palkia", "Heatran", "Regigigas", "Giratina", "Cresselia", "Phione", "Manaphy", "Darkrai", "Shaymin", "Arceus"}
 local ABILITIES_NAMES = {"Stench", "Drizzle", "Speed Boost", "Battle Armor", "Sturdy", "Damp", "Limber", "Sand Veil", "Static", "Volt Absorb", "Water Absorb", "Oblivious", "Cloud Nine", "Compound Eyes", "Insomnia", "Color Change", "Immunity", "Flash Fire", "Shield Dust", "Own Tempo", "Suction Cups", "Intimidate", "Shadow Tag", "Rough Skin", "Wonder Guard", "Levitate", "Effect Spore", "Synchronize", "Clear Body", "Natural Cure", "Lightning Rod", "Serene Grace", "Swift Swim", "Chlorophyll", "Illuminate", "Trace", "Huge Power", "Poison Point", "Inner Focus", "Magma Armor", "Water Veil", "Magnet Pull", "Soundproof", "Rain Dish", "Sand Stream", "Pressure", "Thick Fat", "Early Bird", "Flame Body", "Run Away", "Keen Eye", "Hyper Cutter", "Pickup", "Truant", "Hustle", "Cute Charm", "Plus", "Minus", "Forecast", "Sticky Hold", "Shed Skin", "Guts", "Marvel Scale", "Liquid Ooze", "Overgrow", "Blaze", "Torrent", "Swarm", "Rock Head", "Drought", "Arena Trap", "Vital Spirit", "White Smoke", "Pure Power", "Shell Armor", "Air Lock", "Tangled Feet", "Motor Drive", "Rivalry", "Steadfast", "Snow Cloak", "Gluttony", "Anger Point", "Unburden", "Heatproof", "Simple", "Dry Skin", "Download", "Iron Fist", "Poison Heal", "Adaptability", "Skill Link", "Hydration", "Solar Power", "Quick Feet", "Normalize", "Sniper", "Magic Guard", "No Guard", "Stall", "Technician", "Leaf Guard", "Klutz", "Mold Breaker", "Super Luck", "Aftermath", "Anticipation", "Forewarn", "Unaware", "Tinted Lens", "Filter", "Slow Start", "Scrappy", "Storm Drain", "Ice Body", "Solid Rock", "Snow Warning", "Honey Gather", "Frisk", "Reckless", "Multitype", "Flower Gift", "Bad Dreams"}
@@ -39,7 +36,8 @@ local SPECIES_FORMS = {
     [423] = {""},
     [479] = {"-Heat", "-Wash", "-Frost", "-Fan", "-Mow"},
     [487] = {"-Origin"},
-    [492] = {"-Sky"}}
+    [492] = {"-Sky"}
+}
 
 -- Used to decrypt Pokémon data
 local SHUFFLE = {
@@ -68,39 +66,20 @@ end
 -------------------------------------------------------------------
 -- Decrypt Pokemon attributes and convert them to Pokemon object --
 -------------------------------------------------------------------
-
-function getLevel(experience, speciesId)
-    if (experience and speciesId) then
-        local curve = SPECIES_CURVES[speciesId] + 1
-        local level = 0
-        for lvl = 100, 1, -1 do
-            local lvl_exp = LEVEL_UP_CURVES[lvl][curve]
-            if experience >= lvl_exp then
-                level = lvl
-                break
-            end
-        end
-        return level
-    else
-        return 0
-    end
-end
-
-function mult32(a,b)
-    local c = a >> 16
-    local d = a % 0x10000
-    local e = b >> 16
-    local f = b % 0x10000
-    local g = (c*f + d*e) % 0x10000
+function mult32(a, b)
+    local c = (a >> 16) & 0xFFFF
+    local d = a & 0xFFFF
+    local e = (b >> 16) & 0xFFFF
+    local f = b & 0xFFFF
+    local g = (c * f + d * e) & 0xFFFF
     local h = d * f
-    local i = g * 0x10000 + h
-    return i
+    return (g * 0x10000 + h) & 0xFFFFFFFF
 end
 
 function decryptData(address, length, seed)
     local data = {}
     for i = address, address + length - 2, 2 do
-        seed = mult32(seed, 0x41C64E6D) + 0x6073
+        seed = (mult32(seed, 0x41C64E6D) + 0x6073) & 0xFFFFFFFF
         local encryptedWord = memory.read_u16_le(i)
         local decryptedWord = encryptedWord ~ (seed >> 16)
         data[i - address] = decryptedWord
@@ -117,7 +96,7 @@ function decryptPokemon(pokemonAddress, isBox)
     -- Read each Pokemon attribute
     for i = pokemonAddress, pokemonAddress + 0x6, 2 do
         decrypted[i - pokemonAddress] = memory.read_u16_le(i)
-    end 
+    end
 
     -- Decrypt each attribute
     for i = 0x8, 0x86, 2 do
@@ -135,8 +114,7 @@ function decryptPokemon(pokemonAddress, isBox)
     return decrypted
 end
 
-function getPartyPokemon(slot)
-    local pokemonAddress = PARTY_ADDRESS + PARTY_POKEMON_SIZE * slot
+function getPartyPokemon(pokemonAddress)
     local decrypted = decryptPokemon(pokemonAddress)
     local pid = decrypted[0x2] * 0x10000 + decrypted[0x0]
 
@@ -147,16 +125,17 @@ function getPartyPokemon(slot)
 
     -- PokedexId above 493, hardcoded data that doesn't need decrypting
     if pokedexId > 493 then
-        for i = pokemonAddress, pokemonAddress + PARTY_POKEMON_SIZE, 2 do
+        for i = pokemonAddress, pokemonAddress + 0x6, 2 do
             decrypted[i - pokemonAddress] = memory.read_u16_le(i)
         end
     end
 
-    return createPokemonObject(decrypted)
+    return createPokemonObject(decrypted, pokemonAddress)
 end
 
 function getBoxPokemon(boxSlot)
-    local pokemonAddress = PC_ADDRESS + (BOX_POKEMON_SIZE * boxSlot)
+    local boxAddress = memory.read_u32_le(0x021C0794) + 0x14 + 0xCF2C + 0x4
+    local pokemonAddress = boxAddress + (BOX_POKEMON_SIZE * boxSlot)
 
     -- No Pokemon in box slot
     if memory.read_u32_le(pokemonAddress) == 0 then
@@ -164,12 +143,16 @@ function getBoxPokemon(boxSlot)
     end
 
     local decrypted = decryptPokemon(pokemonAddress, true)
-    local pid = decrypted[0x2] * 0x10000 + decrypted[0x0]
-
-    return createPokemonObject(decrypted)
+    return createPokemonObject(decrypted, pokemonAddress, true)
 end
 
-function createPokemonObject(decrypted)
+function getTrainerPokemon(pokemonAddress)
+    local decrypted = decryptPokemon(pokemonAddress)
+    return createPokemonObject(decrypted, pokemonAddress)
+end
+
+
+function createPokemonObject(decrypted, pokemonAddress, isBox)
     local pokemon = {}
     local pid = decrypted[0x2] * 0x10000 + decrypted[0x0]
 
@@ -182,6 +165,7 @@ function createPokemonObject(decrypted)
 
     pokemon.pid = pid
     pokemon.speciesId = decrypted[blockA]
+
     if pokemon.speciesId == 0 then
         return false
     end
@@ -190,7 +174,18 @@ function createPokemonObject(decrypted)
     pokemon.species = SPECIES_NAMES[pokemon.speciesId]
     pokemon.heldItem = decrypted[blockA + 0x2]
     pokemon.ability = ABILITIES_NAMES[(decrypted[blockA + 0xC] >> 8)]
+
     local genderFormeByte = decrypted[blockB + 0x18]
+    local form = genderFormeByte >> 3
+
+    if form > 0 then
+        local forms = SPECIES_FORMS[pokemon.speciesId]
+
+        if forms ~= nil and form <= #forms then
+            pokemon.species = pokemon.species .. forms[form]
+            pokemon.speciesId = pokemon.speciesId + 1000 * form -- 1386 for Deoxys-A, 2386 for Deoxys-D, etc
+        end
+    end
     
     local ivData = decrypted[blockB + 0x12] * 0x10000 + decrypted[blockB + 0x10]
     local isEgg = ((ivData >> 30) & 1) == 1
@@ -201,29 +196,17 @@ function createPokemonObject(decrypted)
 
     pokemon.isEgg = isEgg
     pokemon.exp = decrypted[blockA + 0xA] * 0x10000 + decrypted[blockA + 0x8]
-    -- pokemon.level = getLevel(pokemon.exp, decrypted[blockA + 0x0])
     pokemon.nature = NATURES_NAMES[pid % 25 + 1]
-    pokemon.hp = (ivData & 0x1F)
-    pokemon.atk = (ivData & 0x3E0) / 0x20
-    pokemon.def = (ivData & 0x7C00) / 0x400
-    pokemon.spa = (ivData & 0x1F00000) / 0x100000
-    pokemon.spd = (ivData & 0x3E000000) / 0x2000000
-    pokemon.spe = (ivData & 0xF8000) / 32768
+    pokemon.evHp = (ivData & 0x1F)
+    pokemon.evAtk = (ivData & 0x3E0) / 0x20
+    pokemon.evDef = (ivData & 0x7C00) / 0x400
+    pokemon.evSpe = (ivData & 0xF8000) / 32768
+    pokemon.evSpa = (ivData & 0x1F00000) / 0x100000
+    pokemon.evSpd = (ivData & 0x3E000000) / 0x2000000
     pokemon.move1 = MOVES_NAMES[decrypted[blockB + 0x0]]
     pokemon.move2 = MOVES_NAMES[decrypted[blockB + 0x2]]
     pokemon.move3 = MOVES_NAMES[decrypted[blockB + 0x4]]
     pokemon.move4 = MOVES_NAMES[decrypted[blockB + 0x6]]
-
-    local hasNickname = (ivData >> 31) == 1
-    if false then
-        pokemon.nickname = ""
-        for i = 0x0, 0x16, 2 do
-            if decrypted[blockC + i] == 0xFFFF then
-                break
-            end
-            pokemon.nickname = pokemon.nickname..CHARACTERS[decrypted[blockC + i]]
-        end
-    end
 
     pokemon.gender = "M"
     if ((genderFormeByte >> 1) & 1) == 1 then
@@ -233,32 +216,77 @@ function createPokemonObject(decrypted)
         pokemon.gender = "N"
     end
 
+    if not isBox then
+        local currentSeed = (mult32(pokemon.pid, 0x41C64E6D) + 0x6073) & 0xFFFFFFFF
+
+        for battleOffset = 0x88, 0x9A, 2 do
+            local key = (currentSeed >> 16) & 0xFFFF
+            local decryptedValue = memory.read_u16_le(pokemonAddress + battleOffset) ~ key
+
+            if battleOffset == 0x88 then pokemon.status = decryptedValue & 0xFF end
+            if battleOffset == 0x8E then pokemon.currentHp = decryptedValue end
+            if battleOffset == 0x90 then pokemon.maxHp = decryptedValue end
+            if battleOffset == 0x92 then pokemon.atk = decryptedValue end
+            if battleOffset == 0x94 then pokemon.def = decryptedValue end
+            if battleOffset == 0x96 then pokemon.spe = decryptedValue end
+            if battleOffset == 0x98 then pokemon.spa = decryptedValue end
+            if battleOffset == 0x9A then pokemon.spd = decryptedValue end
+
+            currentSeed = (mult32(currentSeed, 0x41C64E6D) + 0x6073) & 0xFFFFFFFF
+        end
+    end
+
     return pokemon
+end
+
+function retrieveTrainerTeam(trainerData, opponentAddress, opponentBattleAddress)
+    local opponentParty = {}
+    local opponentPartySize = memory.read_u8(opponentAddress - 4)
+
+    -- First loop : retrieve trainer team original state
+    for partySlot = 0, opponentPartySize - 1 do
+        originalMon = getTrainerPokemon(opponentAddress + PARTY_POKEMON_SIZE * partySlot)
+
+        if (originalMon and originalMon.speciesId ~= 0) then
+            opponentParty[originalMon.pid] = originalMon
+        end
+    end
+
+    -- Second loop : retrieve trainer team current state in battle (we want to keep original item but get current HP)
+    for partySlot = 0, opponentPartySize - 1 do
+        battleMon = getTrainerPokemon(opponentBattleAddress + PARTY_POKEMON_SIZE * partySlot)
+
+        if (battleMon and battleMon.speciesId ~= 0 and opponentParty[battleMon.pid]) then
+            opponentParty[battleMon.pid].currentHp = battleMon.currentHp
+        end
+    end
+
+    -- Final loop : copy trainer team data in file
+    for pid, pokemon in pairs(opponentParty) do
+        trainerData = trainerData .. "|" .. pokemon.speciesId .. "¤" .. pokemon.heldItem .. "¤" .. pokemon.currentHp
+    end
+
+    return trainerData
 end
 
 
 --------------------------------------------------------------
 -- For debug purposes, OBVIOUSLY don't use on official runs --
 --------------------------------------------------------------
-function cheatPokemon(partySlot)
-    local pokemonAddress = PARTY_ADDRESS + PARTY_POKEMON_SIZE * partySlot
+function cheatPokemon(pokemonAddress)
     local pid = memory.read_u32_le(pokemonAddress)
+    local currentSeed = (mult32(pid, 0x41C64E6D) + 0x6073) & 0xFFFFFFFF
 
-    local statusSeed = mult32(pid, 0x41C64E6D) + 0x6073
-    local unknownSeed = mult32(statusSeed, 0x41C64E6D) + 0x6073
-    local levelCapsuleSeed = mult32(unknownSeed, 0x41C64E6D) + 0x6073
-    local currentHpSeed = mult32(levelCapsuleSeed, 0x41C64E6D) + 0x6073
-    local maxHpSeed = mult32(currentHpSeed, 0x41C64E6D) + 0x6073
-    local currentSeed = maxHpSeed
-
-    -- Set Atk/Def/SpA/SpD/Spe to 0xFFFF = 65535 (don't mess with HP since an OHKO move would take forever or freeze the game)
-    for statOffset = 0x92, 0x9A, 2 do
+    for battleOffset = 0x88, 0x9A, 2 do
         local key = (currentSeed >> 16)
-        memory.write_u16_le(pokemonAddress + statOffset - 0x02000000, 64000 ~ key, "Main RAM")
 
-        -- PRNG is calculated using this formula : X[n+1] = (0x41C64E6D * X[n] + 0x6073)
-        currentSeed = mult32(currentSeed, 0x41C64E6D) + 0x6073
+        -- Set Atk/Def/SpA/SpD/Spe to 0xFFFF = 64000 (don't mess with HP since an OHKO move would take forever or freeze the game)
+        if (battleOffset >= 0x92) then
+            memory.write_u16_le(pokemonAddress + battleOffset - 0x02000000, 64000 ~ key, "Main RAM")
         end
+
+        currentSeed = (mult32(currentSeed, 0x41C64E6D) + 0x6073) & 0xFFFFFFFF
+    end
 end
 
 
@@ -269,10 +297,14 @@ function sendPokemonData()
     local currentFrame = emu.framecount()
 
 	-- Execute script logic every second
-    if currentFrame % 360 == 0 then
+    if currentFrame % 60 == 0 then
         lastFrame = currentFrame
 
-        local partySize = memory.read_u8(PARTY_ADDRESS - 4)
+        local BASE_ADDRESS = memory.read_u32_le(0x02101D2C)
+        local PARTY_ADDRESS = BASE_ADDRESS + 0xD094
+        local TRAINERS_START = BASE_ADDRESS + 0xD076
+        local TRAINER_END = BASE_ADDRESS + 0xE1E0
+
 		local i = 0
 
 		local emptyBox = false
@@ -282,18 +314,37 @@ function sendPokemonData()
         local partyPokemon = "PARTY"
         local boxPokemon = "BOX"
         local deadPokemon = "DEAD"
-		local defeatedTrainers = "TRAINERS"
+        local trainerParty = "TRAINERPARTY"
+        local doubleTrainerParty = "DOUBLETRAINERPARTY"
+        local defeatedTrainers = "TRAINERS"
+
+        local partyAddress = PARTY_ADDRESS
+        local partySize = memory.read_u8(partyAddress - 4)
+        local opponentAddress = memory.read_u32_le(BASE_ADDRESS + 0x352F4) + 0x7A0
+        local opponentBattleAddress = 0
+        
+        -- Check if we're in battle to retrieve live-updated stats (like HP)
+        if (opponentAddress > 0x02000000 and opponentAddress < 0x03000000) then
+            local opponentPid = memory.read_u32_le(opponentAddress)
+            local trainerPartySize = memory.read_u8(opponentAddress - 4)
+
+            if (opponentPid > 0 and (trainerPartySize >= 1 and trainerPartySize <= 6)) then
+                partyAddress = PARTY_ADDRESS + 0x4B7F8 -- Party battle data
+                opponentBattleAddress = PARTY_ADDRESS + 0x4BDA8 -- Trainer party battle data
+                inBattle = true
+            end
+        end
 
 		-- Retrieve party Pokémon
         for partySlot = 0, partySize - 1 do
-            mon = getPartyPokemon(partySlot)
+            mon = getPartyPokemon(partyAddress + PARTY_POKEMON_SIZE * partySlot)
 
             if ENABLE_DEBUG_CHEATS then
-                cheatPokemon(partySlot) -- Cheat first Pokemon
+                cheatPokemon(partyAddress + PARTY_POKEMON_SIZE * partySlot)
             end
-
+            
             if (mon and mon.speciesId ~= 0) then
-                partyPokemon = partyPokemon .. "|" .. mon.speciesId .. "¤" .. mon.heldItem
+                partyPokemon = partyPokemon .. "|" .. mon.speciesId .. "¤" .. mon.heldItem .. "¤" .. mon.currentHp .. "¤" .. mon.maxHp .. "¤" .. mon.status
             end
         end
 
@@ -334,6 +385,21 @@ function sendPokemonData()
             i = i + 1
         end
 
+        -- Retrieve trainer party Pokémon
+        if (inBattle) then
+            trainerParty = retrieveTrainerTeam(trainerParty, opponentAddress, opponentBattleAddress)
+
+            -- Retrieve double trainer party Pokémon if present
+            local doubleOpponentAddress = opponentAddress + 0xB60
+            local doubleOpponentBattleAddress = opponentBattleAddress + 0xB60
+            local doubleOpponentPid = memory.read_u32_le(doubleOpponentAddress)
+            local doubleTrainerPartySize = memory.read_u8(doubleOpponentAddress - 4)
+
+            if (doubleOpponentPid > 0 and (doubleTrainerPartySize >= 1 and doubleTrainerPartySize <= 6)) then
+                doubleTrainerParty = retrieveTrainerTeam(doubleTrainerParty, doubleOpponentAddress, doubleOpponentBattleAddress)
+            end
+        end
+
 		-- -- Retrieve booleans indicating if trainers have been defeated
 		for trainerAddress = TRAINERS_START, TRAINER_END do
 			defeatedTrainers = defeatedTrainers .. "|" .. memory.read_u8(trainerAddress)
@@ -347,7 +413,7 @@ function sendPokemonData()
 			local f = io.open(dataFilePath, "w")
 
 			if f then
-				f:write(partyPokemon .. "\n" .. boxPokemon .. "\n" .. deadPokemon .. "\n" .. defeatedTrainers)
+				f:write(partyPokemon .. "\n" .. boxPokemon .. "\n" .. deadPokemon .. "\n" .. defeatedTrainers .. "\n" .. trainerParty .. "\n" .. doubleTrainerParty)
 				f:close()
 			else
 				console.log("Cannot write pokemon data")

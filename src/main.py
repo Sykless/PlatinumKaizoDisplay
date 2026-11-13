@@ -15,6 +15,7 @@ def mainLoop():
     boxClock = 0 # Alternate between every box every 5 seconds
     boxNumber = 0 # Track which box we're currently displaying
     boxDisplayTime = 5 # Default : 5 seconds
+    boxLine, deadLine, partyLine, trainerParty, doubleTrainerParty = [], [], [], [], []
     
     while True:
         try:
@@ -51,6 +52,12 @@ def mainLoop():
                     elif line.startswith("PARTY"):
                         partyLine = parse.parseLine(line)
 
+                    elif line.startswith("TRAINERPARTY"):
+                        trainerParty = parse.parseLine(line)
+
+                    elif line.startswith("DOUBLETRAINERPARTY"):
+                        doubleTrainerParty = parse.parseLine(line)
+
                     elif line.startswith("TRAINERS"):
                         defeatedTrainers = parse.parseLine(line)
 
@@ -58,7 +65,12 @@ def mainLoop():
                 party.generatePlayerPartyImage(PARTY_LABEL, partyLine, 6, 1)
                 party.generatePlayerPartyImage(BOX_LABEL, boxLine, 6, 5)
                 party.generatePlayerPartyImage(DEAD_LABEL, deadLine, columnNumber, rowNumber, customSize = True)
-                trainer.processDefeatedTrainers(defeatedTrainers, 0)
+
+                # Find the trainer we're currently battling
+                trainerFound = trainer.findTrainerFromTeam(trainerParty, doubleTrainerParty)
+
+                if (not trainerFound):
+                    trainer.processDefeatedTrainers(defeatedTrainers, 0)
 
             # Every 5 seconds by default, customizable
             boxClock = (boxClock + 1) % boxDisplayTime

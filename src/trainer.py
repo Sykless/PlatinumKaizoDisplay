@@ -4,6 +4,7 @@ from PIL import Image, ImageEnhance
 
 import file
 import conf
+from parse import PokemonData
 
 TRAINERS_START = 0xD076
 TRAINER_END = 0xE1E0
@@ -274,7 +275,7 @@ def managePaths(trainerList):
 
 
 # Generate an image displaying the trainer sprite, Pokémon team and items
-def generateTrainerCard(trainer):
+def generateTrainerCard(trainer, trainerParty = None, doubleTrainerParty = None):
 	pokemonSprites = [None] * (12 if trainer.doublePartner else 6)
 	itemSprites = [None] * (12 if trainer.doublePartner else 6)
 	
@@ -385,17 +386,47 @@ def generateTrainerCard(trainer):
 	file.safeWriteFile(outputImage, "trainer")
 
 
+# Findf which trainer we're battling from the provided trainer team
+def findTrainerFromTeam(trainerParty: list[PokemonData], doubleTrainerParty: list[PokemonData]):
+
+	# Not battling a trainer, can't match one
+	if (not trainerParty):
+		return False
+
+	# Extract Pokémons with held items and create a pairs set
+	trainerPokemons = [pokemonData.pokedexId for pokemonData in trainerParty]
+	trainerItems = [pokemonData.itemId for pokemonData in trainerParty]
+	battledTrainerPairs = set(zip(trainerPokemons, trainerItems))
+
+	# Iterate on each trainer to find a matching team
+	for trainer in TRAINERLIST:
+
+		# Not even the same number of Pokémons, skip
+		if (len(trainer.pokemonTeam) != len(trainerPokemons)):
+			continue
+
+		# Create a pairs set from trainer database for easier comparison
+		trainerPairs = set(zip(trainer.pokemonTeam, trainer.itemList))
+
+		# Found a match, generate trainer image with provided data
+		if (battledTrainerPairs == trainerPairs):
+			generateTrainerCard(trainer, trainerParty, doubleTrainerParty)
+			return True
+
+	return False
+
+
 # Fill trainer list with data retrieved from documentation
 TRAINERLIST = [
 	TrainerData("Youngster Tristan", "Route 202", 0xE08A, BitNumber(1), [263,161,16], [251,251,244], "youngster-gen4dp"),
 	TrainerData("Lass Natalie", "Route 202", 0xE08A, BitNumber(3), [191,396,261], [155,155,155], "lass-gen4dp"),
-	TrainerData("Bug Catcher Logan", "Route 202", 0xE08A, BitNumber(2), [13,10,265,401], [None,None,None,None], "bugcatcher-gen4dp"),
+	TrainerData("Bug Catcher Logan", "Route 202", 0xE08A, BitNumber(2), [13,10,265,401], [0,0,0,0], "bugcatcher-gen4dp"),
 	TrainerData("Clown Moe", "Jubilife City", 0xDFFD, BitNumber(5), [296,440,175], [158,213,203], "clown"),
 	TrainerData("Clown Mickey", "Jubilife City", 0xDFFD, BitNumber(6), [172,238,174], [43,43,43], "clown"),
 	TrainerData("Clown Ronald", "Jubilife City", 0xDFFD, BitNumber(7), [439,209,173], [269,326,155], "clown"),
 	TrainerData("Lass Samantha", "Route 204 South", 0xE08B, BitNumber(3), [422,37,406], [187,185,184], "lass-gen4dp"),
 	TrainerData("Youngster Tyler", "Route 204 South", 0xE08B, BitNumber(2), [349,129,54], [285,275,285], "youngster-gen4dp"),
-	TrainerData("Lass Sarah", "Route 204 South", 0xE08B, BitNumber(4), [403,300,52], [None,251,251], "lass-gen4dp"),
+	TrainerData("Lass Sarah", "Route 204 South", 0xE08B, BitNumber(4), [403,300,52], [0,251,251], "lass-gen4dp"),
 	TrainerData("Barry #2", "Route 203", 0xDEB0, ExactNumber(1), [190,276,287,56,239,390], [251,273,220,268,268,43], "barry"),
 	TrainerData("Youngster Dallas", "Route 203", 0xE0B6, BitNumber(3), [4,158,252,293], [249,243,239,251], "youngster-gen4dp"),
 	TrainerData("Youngster Michael", "Route 203", 0xE08A, BitNumber(4), [152,255,7,19], [269,249,243,273], "youngster-gen4dp"),
@@ -405,8 +436,8 @@ TRAINERLIST = [
 	TrainerData("Camper Curtis", "Oreburgh Gate", 0xE0AB, BitNumber(1), [216,325,27,278,32], [272,270,237,186,245], "camper"),
 	TrainerData("Picnicker Diana", "Oreburgh Gate", 0xE0B3, BitNumber(1), [133,433,41,280,29], [251,248,244,210,276], "picnicker"),
 	TrainerData("Worker Mason", "Oreburgh Mine", 0xE0A2, BitNumber(4), [415,231,74,399], [222,266,185,43], "worker-gen4"),
-	TrainerData("Worker Colin", "Oreburgh Mine", 0xE0A2, BitNumber(3), [206,111,218,66], [155,270,149,None], "worker-gen4"),
-	TrainerData("Scientist Jonathon", "Oreburgh Gym", 0xE0A8, BitNumber(4), [304,66,138,347,95], [158,234,253,None,288], "scientist-gen4dp"),
+	TrainerData("Worker Colin", "Oreburgh Mine", 0xE0A2, BitNumber(3), [206,111,218,66], [155,270,149,0], "worker-gen4"),
+	TrainerData("Scientist Jonathon", "Oreburgh Gym", 0xE0A8, BitNumber(4), [304,66,138,347,95], [158,234,253,0,288], "scientist-gen4dp"),
 	TrainerData("Ruin Maniac Darius", "Oreburgh Gym", 0xE0A8, BitNumber(5), [410,140,246,240,299], [43,201,272,234,157], "ruinmaniac"),
 	TrainerData("Leader Roark", "Oreburgh Gym", 0xD076, BitNumber(0), [438,345,443,222,213,408], [275,296,150,187,43,157], "roark", boss = True, levelCap = 28),
 	TrainerData("Galacticf Venus", "Jubilife City", 0xDE8E, ExactNumber(4), [322,434,102,109], [284,275,270,265], "galacticgruntf",
@@ -420,7 +451,7 @@ TRAINERLIST = [
 	TrainerData("Galactic Squad Deimos", "Valley Windworks", 0xE0AF, BitNumber(2), [235,200,228,42,371], [269,267,157,275,287], "galacticsquad"),
 	TrainerData("Galactic Squad Phobos", "Valley Windworks", 0xE0AF, BitNumber(3), [355,337,198,197,168], [158,204,270,221,217], "galacticsquad"),
 	TrainerData("Commander Mars", "Valley Windworks", 0xDF3E, ExactNumber(2), [227,449,338,444,207,432], [157,43,213,188,188,234], "mars", boss = True),
-	TrainerData("Camper Jacob", "Route 205 South", 0xE08C, BitNumber(0), [273,86,77,33], [217,221,268,None], "camper"),
+	TrainerData("Camper Jacob", "Route 205 South", 0xE08C, BitNumber(0), [273,86,77,33], [217,221,268,0], "camper"),
 	TrainerData("Hiker Daniel", "Route 205 South", 0xE08C, BitNumber(2), [296,50,21,74], [273,238,266,275], "hiker-gen4"),
 	TrainerData("Aroma Lady Elizabeth", "Route 205 South", 0xE08C, BitNumber(5), [188,270,12,440], [234,296,195,234], "aromalady"),
 	TrainerData("Picnicker Siena", "Route 205 South", 0xE08C, BitNumber(1), [30,298,177,363], [245,266,270,246], "picnicker"),
@@ -482,7 +513,7 @@ TRAINERLIST = [
 	TrainerData("Clown Chance", "Hearthome Gym", 0xE0B4, BitNumber(4), [101,199,262,108], [269,276,157,210], "clown", optional = True),
 	TrainerData("Artist Allen", "Hearthome Gym", 0xE0AD, BitNumber(0), [235,105,354,97,201], [210,258,217,157,267], "artist-gen4", optional = True),
 	TrainerData("Idol Amber", "Hearthome Gym", 0xE08E, BitNumber(1), [432,282,370,314], [327,217,157,222], "idol", optional = True),
-	TrainerData("Leader Fantina ?", "Hearthome Gym", 0xE033, BitNumber(4), [356,426,292,302,354,429], [234,None,275,None,None,None], "fantina"),
+	TrainerData("Leader Fantina ?", "Hearthome Gym", 0xE033, BitNumber(4), [356,426,292,302,354,429], [234,0,275,0,0,0], "fantina"),
 	TrainerData("Clown Justin", "Hearthome Gym", 0xE08E, BitNumber(5), [405,51,342,94], [269,255,286,270], "clown", optional = True),
 	TrainerData("Policeman Kevin", "Hearthome Gym", 0xE08E, BitNumber(4), [235,197,47,303], [275,208,234,209], "policeman-gen4", optional = True),
 	TrainerData("Psychic Helen", "Hearthome Gym", 0xE08E, BitNumber(6), [337,31,479,36], [157,281,213,270], "psychicf-gen4", optional = True),
@@ -492,7 +523,7 @@ TRAINERLIST = [
 	TrainerData("Clown Luigi", "Hearthome Gym", 0xE08E, BitNumber(3), [425,122,424,317,181,463], [158,269,327,286,270,272], "clown"),
 	TrainerData("Ninja Boy Donny", "Hearthome Gym", 0xE0B7, BitNumber(5), [207,168,93,19,123,132], [255,213,312,275,306,154], "ninjaboy", optional = True),
 	TrainerData("Psychic Cheyenne", "Hearthome Gym", 0xE0B3, BitNumber(2), [359,332,196,93,157], [275,213,265,255,211], "psychic-gen4"),
-	TrainerData("Leader Fantina ?", "Hearthome Gym", 0xE0B4, BitNumber(7), [356,426,292,302,354,429], [234,None,275,None,None,None], "fantina", optional = True),
+	TrainerData("Leader Fantina ?", "Hearthome Gym", 0xE0B4, BitNumber(7), [356,426,292,302,354,429], [234,0,275,0,0,0], "fantina", optional = True),
 	TrainerData("Leader Fantina", "Hearthome Gym", 0xD076, BitNumber(4), [478,426,94,442,4479,429], [275,201,265,234,198,157], "fantina", boss = True, levelCap = 42),
 	TrainerData("Barry #3", "Hearthome City", 0xDE96, ExactNumber(2), [277,424,466,289,272,392], [272,270,157,214,234,270], "barry", levelCap = 47),
 	TrainerData("Pkmn Breeder Albert", "Route 209", 0xE08F, BitNumber(6), [122,400,195,80], [158,203,234,154], "pokemonbreeder-gen4"),
@@ -508,7 +539,7 @@ TRAINERLIST = [
 	TrainerData("Belle & Pa Ava & Matt", "Route 210 South", 0xE0AE, BitNumber(2), [428,326,182,25,289], [251,214,238,236,234], "bellepa"),
 	TrainerData("Pkmn Breeder Johnny", "Route 210 South", 0xE091, BitNumber(1), [219,126,114,463,39,238], [275,207,204,207,230,230], "pokemonbreeder-gen4"),
 	TrainerData("Waitress Kati", "Café", 0xE0B7, BitNumber(6), [242,241], [158,157], "waitress-gen4", optional = True),
-	TrainerData("Gambler John Keating", "Café", None, BitNumber(None), [241,122,250,398,99,467], [205,202,202,298,70,249], "gambler", superboss = True),
+	TrainerData("Gambler John Keating", "Café", None, BitNumber(None), [241,122,250,398,99,467], [205,202,202,230,217,298], "gambler", superboss = True),
 	TrainerData("Ruin Maniac Calvin", "Route 215", 0xE0B0, BitNumber(0), [346,347,140,138,366], [234,201,187,187,226], "ruinmaniac"),
 	TrainerData("CyclistF Cecelia", "Route 215", 0xE0B0, BitNumber(3), [457,101,284,436], [222,267,195,215], "cyclistf-gen4"),
 	TrainerData("Twins Teri & Tia", "Route 215", 0xE092, BitNumber(1), [312,311,314,313,279,119], [270,270,150,270,186,243], "twins-gen4dp"),
@@ -657,7 +688,7 @@ TRAINERLIST = [
 	TrainerData("Blackbelt Luke", "Route 217", 0xE09C, BitNumber(4), [83,210,424,297,475,365], [259,234,234,273,234,234], "blackbelt-gen4dp", optional = True),
 	TrainerData("Ace Trainer Dalton", "Route 217", 0xE09B, BitNumber(4), [392,217,277,473,103,230], [234,273,273,270,194,234], "acetrainersnow", optional = True),
 	TrainerData("Ninja Boy Matthew", "Route 217", 0xE09C, BitNumber(2), [292,106,461,463,94,22], [275,272,221,272,281,234], "ninjaboy", optional = True),
-	TrainerData("Skier Bjorn", "Route 217", 0xE09B, BitNumber(7), [254], [None], "skier", optional = True),
+	TrainerData("Skier Bjorn", "Route 217", 0xE09B, BitNumber(7), [254], [0], "skier", optional = True),
 	TrainerData("Skier Shawn", "Route 217", 0xE09B, BitNumber(6), [225,206,18,260,335,182], [275,205,244,217,202,217], "skier", optional = True),
 	TrainerData("Veteran Anton", "Snowpoint Gym", 0xE0F1, BitNumber(3), [473,121,376,321,135], [214,270,234,234,234], "veteran-gen4", optional = True),
 	TrainerData("Ace Trainer Tenzing", "Snowpoint Gym", 0xE0F1, BitNumber(4), [362,365,65,3479,248], [214,186,275,234,234], "acetrainersnow"),
@@ -695,10 +726,10 @@ TRAINERLIST = [
 	TrainerData("Worker Holden", "Fuego Ironworks", 0xE0F3, BitNumber(5), [303,208,257,59,78], [275,208,270,234,270], "worker-gen4", optional = True),
 	TrainerData("Worker Conrad", "Fuego Ironworks", 0xE0F3, BitNumber(6), [229,479,9,454,448], [213,275,210,230,297], "worker-gen4", optional = True),
 	TrainerData("Worker Dillan", "Fuego Ironworks", 0xE0F3, BitNumber(4), [227,68,6,306,323], [234,234,195,189,217], "worker-gen4", optional = True),
-	TrainerData("Ace Trainer Blake", "Route 216", 0xE09A, BitNumber(4), [424,137,352,143], [None, None, None, None], "acetrainersnow", optional = True),
-	TrainerData("Skier Bradley", "Route 216", 0xE09B, BitNumber(0), [361,220,459], [None, None, None], "skier", optional = True),
-	TrainerData("Ace Trainer Maria", "Route 216", 0xE09A, BitNumber(7), [55,78,185,22], [None, None, None, None], "acetrainersnowf", optional = True),
-	TrainerData("Skier Andrea", "Route 216", 0xE09A, BitNumber(3), [108,110,153,64], [None, None, None, None], "skierf-gen4dp", optional = True),
+	TrainerData("Ace Trainer Blake", "Route 216", 0xE09A, BitNumber(4), [424,137,352,143], [0, 0, 0, 0], "acetrainersnow", optional = True),
+	TrainerData("Skier Bradley", "Route 216", 0xE09B, BitNumber(0), [361,220,459], [0, 0, 0], "skier", optional = True),
+	TrainerData("Ace Trainer Maria", "Route 216", 0xE09A, BitNumber(7), [55,78,185,22], [0, 0, 0, 0], "acetrainersnowf", optional = True),
+	TrainerData("Skier Andrea", "Route 216", 0xE09A, BitNumber(3), [108,110,153,64], [0, 0, 0, 0], "skierf-gen4dp", optional = True),
 	TrainerData("Pkmn Ranger Allison", "Route 212", 0xE096, BitNumber(0), [57], [220], "pokemonrangerf-gen4", optional = True),
 	TrainerData("Pkmn Ranger Jeffrey", "Route 212", 0xE095, BitNumber(7), [59], [217], "pokemonranger-gen4", optional = True),
 	TrainerData("Pkmn Ranger Taylor", "Route 212", 0xE095, BitNumber(6), [260], [230], "pokemonranger-gen4", optional = True),
@@ -788,7 +819,7 @@ TRAINERLIST = [
 	TrainerData("Galactic Oberon", "Coronet Highlands - Outside 1", 0xDF4C, ExactNumber(3), [289,248,365,286,448,26], [214,234,217,213,270,191], "galacticgrunt",
 	    doublePartner = TrainerData("Galacticf Titania", "Coronet Highlands - Outside 1", 0xDF4C, ExactNumber(3), [468,334,178,189,251,469], [188,188,230,234,234,213], "galacticgruntf")),
 	TrainerData("Galactic Proteus", "Coronet Highlands - Room 1", 0xE0CA, BitNumber(3), [53,392,97,461,235], [154,157,154,213,230], "galacticgrunt"),
-	TrainerData("Galacticf Laomedeia", "Coronet Highlands - Room 1", 0xE0CA, BitNumber(4), [131,78,149], [None,None,None], "galacticgruntf", optional = True),
+	TrainerData("Galacticf Laomedeia", "Coronet Highlands - Room 1", 0xE0CA, BitNumber(4), [131,78,149], [0,0,0], "galacticgruntf", optional = True),
 	TrainerData("Galacticf Larissa", "Coronet Highlands - Room 1", 0xE0CA, BitNumber(6), [435,436,442,233,110], [255,234,213,234,193], "galacticgruntf"),
 	TrainerData("Galacticf Terra", "Coronet Highlands - Room 1", 0xDF4C, ExactNumber(4), [9,206,257,389,405,376], [186,265,270,208,270,213], "galacticgruntf",
 		doublePartner = TrainerData("Galactic Luna", "Coronet Highlands - Room 1", 0xDF4C, ExactNumber(4), [291,426,169,227,373,337], [230,70,265,157,311,234], "galacticgrunt")),
@@ -822,7 +853,7 @@ TRAINERLIST = [
 	TrainerData("Blackbelt Roku", "Victory Road", 0xE0A6, BitNumber(2), [302,344,430,229,248,160], [157,157,241,149,194,157], "blackbelt-gen4dp"),
 	TrainerData("Beauty Jasmine", "Victory Road", 0xE0A5, BitNumber(6), [376,38,143,171,232,429], [184,191,234,213,270,268], "beauty-gen4dp"),
 	TrainerData("Aroma Lady Fadel", "Victory Road", 0xE0A6, BitNumber(0), [101,184,448,469,148,328], [269,158,157,270,234,230], "aromalady"),
-	TrainerData("Collector Tobias", "Victory Road", 0xE0A6, BitNumber(3), [321,389,477,474,149,59], [None,None,None,None,None,None], "collector"),
+	TrainerData("Collector Tobias", "Victory Road", 0xE0A6, BitNumber(3), [321,389,477,474,149,59], [0,0,0,0,0,0], "collector"),
 	TrainerData("Clown Julia", "Victory Road", 0xE0A6, BitNumber(5), [437,395,461,272,454,91], [234,189,268,275,270,202], "clown"),
 	TrainerData("Hiker J.J Ahern", "Victory Road", 0xE0A7, BitNumber(5), [26,143,94,142,9,6], [300,221,265,217,268,249], "hiker-gen4"),
 	TrainerData("Bug Catcher Ford", "Victory Road", 0xE0A7, BitNumber(3), [135,143,121,80,51,142], [275,189,234,217,232,221], "bugcatcher-gen4dp"),

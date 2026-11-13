@@ -1,7 +1,10 @@
 class PokemonData:
-    def __init__(self, pokedexId, itemId):
+    def __init__(self, pokedexId, itemId, currentHp = None, maxHp = None, status = None):
         self.pokedexId = int(pokedexId) if pokedexId else 0
         self.itemId = int(itemId) if itemId else 0
+        self.currentHp = int(currentHp) if currentHp is not None else None
+        self.maxHp = int(maxHp) if maxHp is not None else None
+        self.status = int(status) if status is not None else None
 
     def __str__(self):
         return self.pokedexId + " - " + self.itemId
@@ -26,7 +29,7 @@ def parseLine(line):
             parsedLine.append(pokemonData)
 
         # Multiple attributes, store them in PokemonData object
-        elif (dataType in ["PARTY", "BOX", "DEAD"]):
+        elif (dataType in ["PARTY", "BOX", "DEAD", "TRAINERPARTY", "DOUBLETRAINERPARTY"]):
             parsedLine.append(PokemonData(*pokemonData.split("¤")))
 
     return parsedLine
