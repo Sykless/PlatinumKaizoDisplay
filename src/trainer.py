@@ -9,6 +9,10 @@ from parse import PokemonData
 TRAINERS_START = 0xD076
 TRAINER_END = 0xE1E0
 
+TURTWIG = 387
+CHIMCHAR = 390
+PIPLUP = 393
+
 SPRITE_FOLDER = "sprites"
 POKEMONSPRITE_FOLDER = SPRITE_FOLDER + "/pokemon"
 ITEMSPRITE_FOLDER = SPRITE_FOLDER + "/items"
@@ -26,35 +30,6 @@ ITEM_SPRITE_SIZE = 32
 TRAINER_CARD_WIDTH = 2 * BACKGROUND_WIDTH
 TRAINER_CARD_HEIGHT = 2 * BACKGROUND_HEIGHT
 
-TRAINERLIST = []
-TRAINER_RIVAL = {
-    "Barry #2" : [
-        {"pokemonTeam": [190,276,287,56,239,390], "itemList": [251,273,220,268,268,43]},
-        {"pokemonTeam": [190,276,287,56,239,393], "itemList": [251,273,220,268,268,43]},
-        {"pokemonTeam": [190,276,287,56,239,387], "itemList": [251,273,220,268,268,43]},
-    ],
-    "Barry #3" : [
-        {"pokemonTeam": [277,424,466,289,272,392], "itemList": [272,270,157,214,234,270]},
-        {"pokemonTeam": [277,424,466,289,51,395], "itemList": [272,214,268,270,275,158]},
-        {"pokemonTeam": [277,424,466,289,57,389], "itemList": [272,251,270,157,268,234]},
-    ],
-    "Barry #4" : [
-        {"pokemonTeam": [398,424,466,289,254,392], "itemList": [214,157,157,157,266,275]},
-        {"pokemonTeam": [398,424,466,289,260,395], "itemList": [251,270,268,214,268,201]},
-        {"pokemonTeam": [398,424,466,289,257,389], "itemList": [157,214,157,214,266,234]},
-    ],
-    "Barry #5" : [
-		{"pokemonTeam": [398,424,466,289,254,392], "itemList": [157,251,268,214,204,241]},
-		{"pokemonTeam": [398,424,466,289,260,395], "itemList": [157,251,268,214,187,270]},
-		{"pokemonTeam": [398,424,466,289,257,389], "itemList": [157,251,268,214,157,270]},
-	],
-	"Barry #6" : [
-		{"pokemonTeam": [289,398,466,424,254,392], "itemList": [202,306,270,275,214,298]},
-		{"pokemonTeam": [289,398,466,424,260,395], "itemList": [202,306,270,275,187,299]},
-		{"pokemonTeam": [289,398,466,424,257,389], "itemList": [202,306,270,275,268,301]},
-	]
-}
-
 LARGE_GALACTIC_ZONES = {
 	"Galactic HQ": [
 		"Veilstone Warehouse",
@@ -69,6 +44,10 @@ LARGE_GALACTIC_ZONES = {
 	]
 }
 
+
+# --------------------------------------------------
+# TrainerData class
+# --------------------------------------------------
 class BitNumber:
 	def __init__(self, value):
 		self.value = value
@@ -78,7 +57,7 @@ class ExactNumber:
 		self.value = value
 
 class TrainerData:
-	def __init__(self, name, zone, address, bitNumber, pokemonTeam, itemList, spriteName, optional = False, boss = False, superboss = False, path = None, levelCap = None, doublePartner = None):
+	def __init__(self, name, zone, address, bitNumber, pokemonTeam, itemList, spriteName, optional = False, boss = False, superboss = False, path = None, starter = None, levelCap = None, doublePartner = None):
 		self.name = name
 		self.zone = zone
 		self.address = address
@@ -86,88 +65,57 @@ class TrainerData:
 		self.pokemonTeam = pokemonTeam
 		self.itemList = itemList
 		self.spriteName = spriteName
+		self.trainerId = -1
 
 		# Optional attributes
 		self.optional = optional # Only taken into account if set in conf.json 
 		self.boss = boss # Set all trainers in its zone to defeated if beaten
 		self.superboss = superboss # Never included in all processes, just there in case we choose to fight them
 		self.path = path # Part of a path that can be taken or skipped for an alternative path
+		self.starter = starter # Used to determine which Barry fight to pick
 		self.levelCap = levelCap # Updates the level cap if defeated
 		self.doublePartner = doublePartner # Trainer in the battle as double partner
 		self.defeated = False # Defeated or hardset to True if boss beaten
 		self.skipped = False # Not defeated but skipped because an alternative path has been used
+		self.deadTeam = False # Only used to avoid displaying the trainer image again
 
 	def isMandatory(self):
 		return not self.optional and not self.path and not self.skipped
 
+	def getCompleteName(self):
+		return self.name + ((" + " + self.doublePartner.name) if self.doublePartner else "")
+
 	def __str__(self):
 		return f'TrainerData("{self.name}", {self.address:#010X}, {self.bitNumber.value}, [{",".join(str(pokedexId) for pokedexId in self.pokemonTeam)}], "{self.spriteName}", defeated = "{self.defeated}", skipped = "{self.skipped}")'
 
-
-# Retrieve trainer data to determine who has been beaten and who is next
-def processDefeatedTrainers(defeatedTrainers, pickedStarter):
-	nextTrainer = None
-	veryNextTrainerId = -1
-	lastDefeatedTrainerId = -1
-
-	# Extract original trainer list and updates which have been defeated
-	trainerList = copy.deepcopy([trainer for trainer in TRAINERLIST if not trainer.superboss])
-	levelCap = processTrainers(trainerList, defeatedTrainers)
-
-	# Manage alternative paths (choice between multiple trainers)
-	currentPathTrainerId = managePaths(trainerList)
-
-	# Currently in an unfinished path : start from there
-	if (currentPathTrainerId):
-		veryNextTrainerId = currentPathTrainerId
-
-	# Check which trainer is the next needed to defeat
-	for trainerId in range(len(trainerList)):
-		trainer = trainerList[trainerId]
-
-		# Defeated trainer
-		if (trainer.defeated): # 320
-			lastDefeatedTrainerId = trainerId
-
-		# Trainer not defeated
-		else:
-			if (trainer.optional or trainer.skipped):
-				continue
-
-			if (veryNextTrainerId < 0): # 300
-				veryNextTrainerId = trainerId
-
-			# Rival team depends in picked starter
-			if ("Barry" in trainer.name):
-				trainer.pokemonTeam = TRAINER_RIVAL[trainer.name][pickedStarter]["pokemonTeam"]
-				trainer.itemList = TRAINER_RIVAL[trainer.name][pickedStarter]["itemList"]
-
-	# Nominal case : next trainer is the first undefeated trainer
-	nextTrainer = trainerList[veryNextTrainerId]
-
-	# Particular case : we defeated a trainer in a later zone
-	if (lastDefeatedTrainerId > veryNextTrainerId):
-		lastDefeatedTrainer = trainerList[lastDefeatedTrainerId]
-
-		# Stay in the same zone as the last defeated trainer if there are still trainers there
-		if (lastDefeatedTrainerId + 1 < len(trainerList) and trainerList[lastDefeatedTrainerId + 1].zone == lastDefeatedTrainer.zone):
-			nextTrainer = trainerList[lastDefeatedTrainerId + 1]
-
-	# Generate trainer image
-	generateTrainerCard(nextTrainer)
-
-	# Save level cap so we can use it in other images
-	return levelCap
+	def __eq__(self, trainer):
+		if not isinstance(trainer, TrainerData):
+			return False
+		return self.name == trainer.name and self.pokemonTeam == trainer.pokemonTeam and self.itemList == trainer.itemList
 
 
-def processTrainers(trainerList: list[TrainerData], defeatedTrainers):
-	trainerId = len(trainerList) - 1
-	nextTrainer = trainerList[trainerId]
+# --------------------------------------------------
+# Dynamic Trainer list shared between files
+# --------------------------------------------------
+TRAINERLIST = [] # Populated all the way down below
+trainerList = []
 
-	# Default level cap is 16 until Roark
-	levelCap = 16
+# Retrieve editable trainer list taking rival potential team into account
+def refreshTrainerList(pickedStarter, defeatedTrainers):
+	pickedStarter = pickedStarter if pickedStarter in [TURTWIG, CHIMCHAR, TURTWIG] else TURTWIG
 
-	# Retrieve trainers data from emulator and determine who has been defeated
+	# Reset trainer list
+	global trainerList
+	trainerList = []
+	
+	# Extract original trainer list but ignore superboss and rival with different starter
+	for trainer in TRAINERLIST:
+		if (trainer.superboss or trainer.starter and trainer.starter != pickedStarter):
+			continue
+
+		trainerList.append(copy.deepcopy(trainer))
+
+	# First loop : determine which trainers have been defeated by reading emulator data
 	for trainer in trainerList:
 		trainerByte = defeatedTrainers[trainer.address - TRAINERS_START]
 		
@@ -177,17 +125,18 @@ def processTrainers(trainerList: list[TrainerData], defeatedTrainers):
 		elif (isinstance(trainer.bitNumber, ExactNumber)):
 			trainer.defeated = (int(trainerByte) >= trainer.bitNumber.value)
 
+	trainerId = len(trainerList) - 1
+	nextTrainer = trainerList[trainerId]
+	currentPathTrainerId = None
+
 	# Second loop for other processes (level cap, skipped mandatory trainer, boss management)
 	while (trainerId >= 0):
 		trainer = trainerList[trainerId]
+		trainer.trainerId = trainerId
 
 		# Next trainer in the zone defeated but current trainer supposedly mandatory, mark it as skipped
 		if (not trainer.defeated and trainer.isMandatory() and trainer.zone == nextTrainer.zone and nextTrainer.defeated):
 			trainer.skipped = True
-
-		# Increase level cap when a boss is defeated
-		if (trainer.defeated and trainer.levelCap and levelCap == 16):
-			levelCap = trainer.levelCap
 
 		# On Galactic/Gym zones, mark all trainers as defeated if boss is defeated
 		if (trainer.boss and trainer.defeated):
@@ -205,13 +154,7 @@ def processTrainers(trainerList: list[TrainerData], defeatedTrainers):
 		nextTrainer = trainerList[trainerId]
 		trainerId -= 1
 
-	return levelCap
-
-
-# Manage alternative paths (choice between multiple trainers)
-def managePaths(trainerList):
-	currentPathTrainerId = None
-
+	# Third loop : manage alternative paths (choice between multiple trainers)
 	for trainerId in range(len(trainerList)):
 		trainer = trainerList[trainerId]
 
@@ -273,9 +216,57 @@ def managePaths(trainerList):
 
 	return currentPathTrainerId
 
+def getTrainerList():
+    return trainerList
+
+
+# --------------------------------------------------
+# Trainer methods
+# --------------------------------------------------
+
+# Retrieve which trainer is next
+def getNextTrainer(currentPathTrainerId):
+	trainerList = getTrainerList()
+	lastDefeatedTrainerId = -1
+	veryNextTrainerId = -1
+	nextTrainerId = 0
+
+	# Currently in an unfinished path : start from there
+	if (currentPathTrainerId):
+		veryNextTrainerId = currentPathTrainerId
+
+	# Check which trainer is the next needed to defeat
+	for trainerId in range(len(trainerList)):
+		trainer = trainerList[trainerId]
+
+		# Defeated trainer
+		if (trainer.defeated):
+			lastDefeatedTrainerId = trainerId
+
+		# Trainer not defeated
+		else:
+			if (trainer.optional or trainer.skipped):
+				continue
+
+			if (veryNextTrainerId < 0):
+				veryNextTrainerId = trainerId
+
+	# Nominal case : next trainer is the first undefeated trainer
+	nextTrainerId = veryNextTrainerId
+
+	# Particular case : we defeated a trainer in a later zone
+	if (lastDefeatedTrainerId > veryNextTrainerId):
+		lastDefeatedTrainer = trainerList[lastDefeatedTrainerId]
+
+		# Stay in the same zone as the last defeated trainer if there are still trainers there
+		if (lastDefeatedTrainerId + 1 < len(trainerList) and trainerList[lastDefeatedTrainerId + 1].zone == lastDefeatedTrainer.zone):
+			nextTrainerId = lastDefeatedTrainerId + 1
+
+	return trainerList[nextTrainerId]
+
 
 # Generate an image displaying the trainer sprite, Pokémon team and items
-def generateTrainerCard(trainer, trainerParty = None, doubleTrainerParty = None):
+def generateTrainerCard(trainer: TrainerData, trainerParty: list[PokemonData] = [], doubleTrainerParty: list[PokemonData] = []):
 	pokemonSprites = [None] * (12 if trainer.doublePartner else 6)
 	itemSprites = [None] * (12 if trainer.doublePartner else 6)
 	
@@ -327,16 +318,25 @@ def generateTrainerCard(trainer, trainerParty = None, doubleTrainerParty = None)
 
 	# Build pokemon team and item list
 	pokemonTeam = trainer.pokemonTeam + [None] * (6 - len(trainer.pokemonTeam))
-	itemList = trainer.itemList + [None] * (6 - len(trainer.itemList))
+	itemList = trainer.itemList + [0] * (6 - len(trainer.itemList))
 
 	if (trainer.doublePartner):
 		pokemonTeam += trainer.doublePartner.pokemonTeam + [None] * (6 - len(trainer.doublePartner.pokemonTeam))
-		itemList += trainer.doublePartner.itemList + [None] * (6 - len(trainer.doublePartner.itemList))
+		itemList += trainer.doublePartner.itemList + [0] * (6 - len(trainer.doublePartner.itemList))
 
 	# Retrieve each Pokémon and held item sprites in trainer team
 	for i in range(len(pokemonTeam)):
 		pokedexId = pokemonTeam[i]
 		itemId = itemList[i]
+		pokemonKo = False
+
+		# Currently battling a trainer, check if each Pokémon still has HP
+		if (trainerParty):
+			for party in [trainerParty, doubleTrainerParty]:
+				for pokemonData in party:
+					if (pokemonData.pokedexId == pokedexId and pokemonData.itemId == itemId):
+						pokemonKo = (pokemonData.currentHp == 0)
+						break
 
 		# Retrieve Pokémon sprite from pokedexId and display it
 		if (pokedexId):
@@ -345,6 +345,7 @@ def generateTrainerCard(trainer, trainerParty = None, doubleTrainerParty = None)
 				pokemonSpritePath = os.path.join(POKEMONSPRITE_FOLDER, "0.png")
 
 			pokemonSprites[i] = Image.open(pokemonSpritePath).convert("RGBA").resize((TRAINER_POKEMON_SPRITE_WIDTH, TRAINER_POKEMON_SPRITE_HEIGHT), Image.NEAREST)
+			pokemonSprites[i] = ImageEnhance.Brightness(pokemonSprites[i]).enhance(0.3 if pokemonKo else 1)
 
 		# Retrieve item sprite from itemId and display it
 		if (itemId and conf.isTrainerItemSpriteDisplayed()):
@@ -353,6 +354,7 @@ def generateTrainerCard(trainer, trainerParty = None, doubleTrainerParty = None)
 				itemSpritePath = os.path.join(ITEMSPRITE_FOLDER, "0.png")
 
 			itemSprites[i] = Image.open(itemSpritePath).convert("RGBA").resize((TRAINER_ITEMS_SPRITE_SIZE, TRAINER_ITEMS_SPRITE_SIZE), Image.NEAREST)
+			itemSprites[i] = ImageEnhance.Brightness(itemSprites[i]).enhance(0.3 if pokemonKo else 1)
 
 	# Set positions depending on team size and if double battle
 	baseX = int(7/8 * TRAINER_SPRITE_SIZE * 6)
@@ -382,38 +384,53 @@ def generateTrainerCard(trainer, trainerParty = None, doubleTrainerParty = None)
 				y = y + int(0.95 * TRAINER_ITEMS_SPRITE_SIZE)
 				outputImage.paste(itemSprites[i], (x,y), itemSprites[i])
 
-	# Save image in output folder
-	file.safeWriteFile(outputImage, "trainer")
+	return outputImage
 
 
-# Findf which trainer we're battling from the provided trainer team
-def findTrainerFromTeam(trainerParty: list[PokemonData], doubleTrainerParty: list[PokemonData]):
-
-	# Not battling a trainer, can't match one
+# Find which trainer we're battling from the provided trainer team
+def findTrainerFromTeam(oldTrainer: TrainerData, trainerParty: list[PokemonData], doubleTrainerParty: list[PokemonData]):
+	
+	# Not battling a trainer, can't match one, return old battleOver value
 	if (not trainerParty):
-		return False
+		return False, oldTrainer
 
-	# Extract Pokémons with held items and create a pairs set
-	trainerPokemons = [pokemonData.pokedexId for pokemonData in trainerParty]
-	trainerItems = [pokemonData.itemId for pokemonData in trainerParty]
-	battledTrainerPairs = set(zip(trainerPokemons, trainerItems))
+	# Search a match with both trainer and double trainer team
+	for currentParty in [trainerParty, doubleTrainerParty]:
 
-	# Iterate on each trainer to find a matching team
-	for trainer in TRAINERLIST:
+		# Extract Pokémons with held items and create a pairs set
+		trainerPokemons = [pokemonData.pokedexId for pokemonData in currentParty]
+		trainerItems = [pokemonData.itemId for pokemonData in currentParty]
+		battledTrainerPairs = set(zip(trainerPokemons, trainerItems))
 
-		# Not even the same number of Pokémons, skip
-		if (len(trainer.pokemonTeam) != len(trainerPokemons)):
-			continue
+		# Iterate on each trainer to find a matching team
+		for trainer in TRAINERLIST:
 
-		# Create a pairs set from trainer database for easier comparison
-		trainerPairs = set(zip(trainer.pokemonTeam, trainer.itemList))
+			# Not even the same number of Pokémons, skip
+			if (len(trainer.pokemonTeam) != len(trainerPokemons)):
+				continue
 
-		# Found a match, generate trainer image with provided data
-		if (battledTrainerPairs == trainerPairs):
-			generateTrainerCard(trainer, trainerParty, doubleTrainerParty)
-			return True
+			# Create a pairs set from trainer database for easier comparison
+			trainerPairs = set(zip(trainer.pokemonTeam, trainer.itemList))
 
-	return False
+			# Found a match, check if trainer team is KO and return it
+			if (battledTrainerPairs == trainerPairs):
+				battledTrainer = copy.deepcopy(trainer)
+				battledTrainer.deadTeam = all(trainerData.currentHp == 0 for trainerData in trainerParty + doubleTrainerParty)
+				return True, battledTrainer
+
+	return False, oldTrainer
+
+
+# Find id in current trainer list
+def getTrainerId(trainer: TrainerData):
+	trainerList = getTrainerList()
+
+	for trainerId in range(len(trainerList)):
+		if (trainerList[trainerId] == trainer):
+			return trainerId
+
+	# Not found
+	return -1
 
 
 # Fill trainer list with data retrieved from documentation
@@ -427,7 +444,9 @@ TRAINERLIST = [
 	TrainerData("Lass Samantha", "Route 204 South", 0xE08B, BitNumber(3), [422,37,406], [187,185,184], "lass-gen4dp"),
 	TrainerData("Youngster Tyler", "Route 204 South", 0xE08B, BitNumber(2), [349,129,54], [285,275,285], "youngster-gen4dp"),
 	TrainerData("Lass Sarah", "Route 204 South", 0xE08B, BitNumber(4), [403,300,52], [0,251,251], "lass-gen4dp"),
-	TrainerData("Barry #2", "Route 203", 0xDEB0, ExactNumber(1), [190,276,287,56,239,390], [251,273,220,268,268,43], "barry"),
+	TrainerData("Barry #2 - Turtwig", "Route 203", 0xDEB0, ExactNumber(1), [190,276,287,56,239,390], [251,273,220,268,268,43], "barry", starter = TURTWIG),
+	TrainerData("Barry #2 - Chimchar", "Route 203", 0xDEB0, ExactNumber(1), [190,276,287,56,239,393], [251,273,220,268,268,43], "barry", starter = CHIMCHAR),
+	TrainerData("Barry #2 - Piplup", "Route 203", 0xDEB0, ExactNumber(1), [190,276,287,56,239,387], [251,273,220,268,268,43], "barry", starter = PIPLUP),
 	TrainerData("Youngster Dallas", "Route 203", 0xE0B6, BitNumber(3), [4,158,252,293], [249,243,239,251], "youngster-gen4dp"),
 	TrainerData("Youngster Michael", "Route 203", 0xE08A, BitNumber(4), [152,255,7,19], [269,249,243,273], "youngster-gen4dp"),
 	TrainerData("Bug Catcher Sebastian", "Route 203", 0xE0B6, BitNumber(4), [1412,268,266,14,11], [43,43,43,43,43], "bugcatcher-gen4dp"),
@@ -525,7 +544,9 @@ TRAINERLIST = [
 	TrainerData("Psychic Cheyenne", "Hearthome Gym", 0xE0B3, BitNumber(2), [359,332,196,93,157], [275,213,265,255,211], "psychic-gen4"),
 	TrainerData("Leader Fantina ?", "Hearthome Gym", 0xE0B4, BitNumber(7), [356,426,292,302,354,429], [234,0,275,0,0,0], "fantina", optional = True),
 	TrainerData("Leader Fantina", "Hearthome Gym", 0xD076, BitNumber(4), [478,426,94,442,4479,429], [275,201,265,234,198,157], "fantina", boss = True, levelCap = 42),
-	TrainerData("Barry #3", "Hearthome City", 0xDE96, ExactNumber(2), [277,424,466,289,272,392], [272,270,157,214,234,270], "barry", levelCap = 47),
+	TrainerData("Barry #3 - Turtwig", "Hearthome City", 0xDE96, ExactNumber(2), [277,424,466,289,272,392], [272,270,157,214,234,270], "barry", levelCap = 47, starter = TURTWIG),
+	TrainerData("Barry #3 - Chimchar", "Hearthome City", 0xDE96, ExactNumber(2), [277,424,466,289,51,395], [272,214,268,270,275,158], "barry", levelCap = 47, starter = CHIMCHAR),
+	TrainerData("Barry #3 - Piplup", "Hearthome City", 0xDE96, ExactNumber(2), [277,424,466,289,57,389], [272,251,270,157,268,234], "barry", levelCap = 47, starter = PIPLUP),
 	TrainerData("Pkmn Breeder Albert", "Route 209", 0xE08F, BitNumber(6), [122,400,195,80], [158,203,234,154], "pokemonbreeder-gen4"),
 	TrainerData("Jogger Richard", "Route 209", 0xE090, BitNumber(1), [82,85,51], [191,186,188], "jogger"),
 	TrainerData("Twins Emma & Lil", "Route 209", 0xE0AE, BitNumber(6), [203,319,405,59,446], [327,243,327,327,272], "twins-gen4dp"),
@@ -584,7 +605,9 @@ TRAINERLIST = [
 	TrainerData("Sailor Paul", "Route 213", 0xE097, BitNumber(6), [210,279,67,87], [158,276,241,203], "sailor"),
 	TrainerData("Beauty Chelle", "Route 213", 0xDF94, ExactNumber(9), [112,301,123,327,171,154], [275,251,275,161,234,42], "beauty-gen4dp"),
 	TrainerData("PKMN Breeder Frank", "Pastoria City", None, BitNumber(None), [107,369,143,357,229,334], [230,230,202,204,230,202], "pokemonbreeder-gen4", superboss = True),
-	TrainerData("Barry #4", "Pastoria City", 0xDE98, ExactNumber(2), [398,424,466,289,254,392], [214,157,157,157,266,275], "barry"),
+	TrainerData("Barry #4 - Turtwig", "Pastoria City", 0xDE98, ExactNumber(2), [398,424,466,289,254,392], [214,157,157,157,266,275], "barry", starter = TURTWIG),
+	TrainerData("Barry #4 - Chimchar", "Pastoria City", 0xDE98, ExactNumber(2), [398,424,466,289,260,395], [251,270,268,214,268,201], "barry", starter = CHIMCHAR),
+	TrainerData("Barry #4 - Piplup", "Pastoria City", 0xDE98, ExactNumber(2), [398,424,466,289,257,389], [157,214,157,214,266,234], "barry", starter = PIPLUP),
 	TrainerData("Roughneck Walter", "Pastoria Gym", 0xE0BC, BitNumber(1), [452,455,130,160,454,342], [270,213,186,214,234,275], "roughneck-gen4"),
 	TrainerData("Fisherman Josh", "Pastoria Gym", 0xE095, BitNumber(4), [101,119,99,319,340,80], [269,157,326,214,214,234], "fisherman-gen4"),
 	TrainerData("Tuber Jacky", "Pastoria Gym", 0xE0C8, BitNumber(1), [463,47,426,195,26,55], [272,217,211,234,275,157], "tuber"),
@@ -613,7 +636,7 @@ TRAINERLIST = [
 	TrainerData("Gentleman Butler", "Pokemon Mansion", 0xE031, BitNumber(3), [149], [220], "gentleman-gen4dp"),
 	TrainerData("Policeman Danny", "Pokemon Mansion - Exterior", None, BitNumber(None), [59,229,110,411,310,306], [270,270,270,270,270,270], "policeman-gen4", superboss = True),
 	TrainerData("Galacticf Luna", "Clamberclaw Cliffs", 0xE092, BitNumber(2), [34,197,36,184,217,337], [255,234,158,299,230,210], "galacticgruntf"),
-	TrainerData("Galactic Valetudo", "Clamberclaw Cliffs", 0xE092, BitNumber(7), [34,199,230,405,99], [214,230,234,230,221], "galacticgrunt", optional = True),
+	TrainerData("Galactic Valetudo", "Clamberclaw Cliffs", 0xE092, BitNumber(7), [34,199,289,230,405,99], [214,230,234,230,221,203], "galacticgrunt", optional = True),
 	TrainerData("Galacticf Terra", "Clamberclaw Cliffs", 0xE092, BitNumber(3), [205,389,426,409,321,351], [184,194,211,213,234,270], "galacticgruntf"),
 	TrainerData("Galacticf Venus", "Clamberclaw Cliffs", 0xE093, BitNumber(1), [435,3,242,350,429,229], [270,281,202,202,203,230], "galacticgruntf"),
 	TrainerData("Galactic Squad Leda", "Clamberclaw Cliffs", 0xE093, BitNumber(3), [110,463,85,254,423,59], [255,234,230,214,187,265], "galacticsquad"),
@@ -631,7 +654,9 @@ TRAINERLIST = [
 	TrainerData("Commander Jupiter", "Clamberclaw Cliffs", 0xE1E0, ExactNumber(2), [128,130,462,308,377,465], [214,186,276,270,157,276], "jupiter", boss = True),
 	TrainerData("Galactic Mercury", "Celestic Town", 0xE015, BitNumber(7), [344,430,169,472,469], [214,270,221,188,195], "galacticgrunt"),
 	TrainerData("Leader Cyrus", "Celestic Town", 0xDE88, ExactNumber(1), [3386,376,3479,245,373,461], [157,270,158,213,197,230], "cyrus", boss = True),
-	TrainerData("Barry #5", "Canalave City", 0xDE90, ExactNumber(1), [398,424,466,289,254,392], [157,251,268,214,204,241], "barry", levelCap = 65),
+	TrainerData("Barry #5 - Turtwig", "Canalave City", 0xDE90, ExactNumber(1), [398,424,466,289,254,392], [157,251,268,214,204,241], "barry", levelCap = 65, starter = TURTWIG),
+	TrainerData("Barry #5 - Chimchar", "Canalave City", 0xDE90, ExactNumber(1), [398,424,466,289,260,395], [157,251,268,214,187,270], "barry", levelCap = 65, starter = CHIMCHAR),
+	TrainerData("Barry #5 - Piplup", "Canalave City", 0xDE90, ExactNumber(1), [398,424,466,289,257,389], [157,251,268,214,157,270], "barry", levelCap = 65, starter = PIPLUP),
 	TrainerData("Galacticf Calypso", "Iron Island", 0xE0C2, BitNumber(5), [423,141,205,351], [234,187,222,268], "galacticgruntf",
 		doublePartner = TrainerData("Galactic Thalassa", "Iron Island", 0xE0C2, BitNumber(4), [437,348,139,73], [278,327,187,234], "galacticgrunt")),
 	TrainerData("Galacticf Despina", "Iron Island", 0xE0C9, BitNumber(1), [49,475,464,227], [213,326,185,244], "galacticgruntf",
@@ -675,7 +700,7 @@ TRAINERLIST = [
 		doublePartner = TrainerData("Galactic Pluto", "Lake Verity", 0xE0AD, BitNumber(6), [460,221,471,365], [184,203,157,286], "galacticgrunt")),
 	TrainerData("Galactic Squad Deimos", "Lake Verity", 0xDEC0, ExactNumber(4), [235,229,178,442,97,452], [234,234,270,210,234,200], "galacticsquad",
 		doublePartner = TrainerData("Galactic Squad Phobos", "Lake Verity", 0xDEC0, ExactNumber(4), [330,332,472,430,429,337], [255,230,188,234,234,157], "galacticsquad")),
-	TrainerData("Commander Mars", "Lake Verity", 0xDEC0, ExactNumber(5), [445,260,385,38,481], [214,188,187,157,270], "mars", boss = True,
+	TrainerData("Commander Mars", "Lake Verity", 0xDEC0, ExactNumber(5), [450, 445,260,385,38,481], [214,188,187,157,270,234], "mars", boss = True,
 		doublePartner = TrainerData("Galacticf Terra", "Lake Verity", 0xDEC0, ExactNumber(5), [462,5479,389,344], [269,300,270,158], "galacticgruntf", boss = True)),
 	TrainerData("Skier Edward", "Route 216", 0xE09B, BitNumber(1), [221,22,203,234], [275,234,272,234], "skier"),
 	TrainerData("Skier Kaitlyn", "Route 216", 0xE09B, BitNumber(2), [225,335,18,182], [275,189,188,189], "skierf-gen4dp"),
@@ -708,7 +733,7 @@ TRAINERLIST = [
 	TrainerData("Sailor Jack", "Route 222", 0xE0B4, BitNumber(1), [279,357,20], [275,188,273], "sailor",
 		doublePartner = TrainerData("Lady Rose", "Route 222", 0xE0B6, BitNumber(7), [105,134,31], [258,187,265], "lady-gen4")),
 	TrainerData("Interviewers Barbara & Walter", "Route 222", 0xE0A0, BitNumber(6), [102,426,51,85,82], [265,158,270,232,275], "interviewers"),
-	TrainerData("Socialite Alec", "Route 222", 0xE09F, BitNumber(5), [182,135], [275,242], "madame-gen4",
+	TrainerData("Socialite Alec", "Route 222", 0xE09F, BitNumber(5), [182,135,196], [275,242,267], "madame-gen4",
 		doublePartner = TrainerData("Gentleman Luther", "Route 222", 0xE0A0, BitNumber(4), [289,34,199], [221,221,158], "gentleman-gen4dp")),
 	TrainerData("TuberF Holly", "Route 222", 0xE0B7, BitNumber(1), [223,363,98,418], [230,217,217,230], "tuberf", optional = True),
 	TrainerData("Pokefan Liz", "Sunyshore Gym", 0xDE68, ExactNumber(1), [130,80,468], [214,234,157], "pokefanf-gen4",
@@ -716,7 +741,7 @@ TRAINERLIST = [
 	TrainerData("Clown Forrest", "Sunyshore Gym", 0xDE68, ExactNumber(2), [476,199,122,94,101], [191,209,270,270,211], "clown"),
 	TrainerData("Pokekid Maggie", "Sunyshore Gym", 0xDE68, ExactNumber(3), [426,354,25,40,224], [207,247,236,157,157], "pokekid"),
 	TrainerData("Cowgirl Meghan", "Sunyshore Gym", 0xDE68, ExactNumber(4), [59,181,241,468,326,210], [286,270,208,221,198,251], "cowgirl"),
-	TrainerData("Worker Hugh", "Sunyshore Gym", 0xDE68, ExactNumber(5), [232,171], [275,234], "worker-gen4",
+	TrainerData("Worker Hugh", "Sunyshore Gym", 0xDE68, ExactNumber(5), [232,171,464], [275,234,187], "worker-gen4",
 		doublePartner = TrainerData("Waiter Reynolds", "Sunyshore Gym", 0xDE68, ExactNumber(5), [135,462,1479], [275,184,208], "waiter-gen4dp"),),
 	TrainerData("Psychic Destiny", "Sunyshore Gym", 0xDE68, ExactNumber(6), [197,196,135,429,475,178], [234,327,157,270,234,270], "psychic-gen4"),
 	TrainerData("Gambler Ace", "Sunyshore Gym", 0xDE68, ExactNumber(7), [302,306,206,430,97], [213,275,157,221,213], "gambler"),
@@ -802,8 +827,8 @@ TRAINERLIST = [
 	TrainerData("Leader Cyrus", "Galactic HQ", 0xDF4C, ExactNumber(1), [2386,409,485,379,477,486], [234,70,158,234,70,278], "cyrus"),
 	TrainerData("Galactic Io", "Galactic HQ", 0xDF4C, ExactNumber(2), [323,241,452,373,474,467], [270,278,294,215,290,292], "galacticgrunt"),
 	TrainerData("Commander Saturn", "Galactic HQ", 0xDFF5, BitNumber(5), [480,145,376,112,321,488], [157,215,157,275,234,234], "saturn", boss = True),
-	TrainerData("Galactic Ganymede", "Mount Coronet - Room 1", 0xE0CB, BitNumber(4), [328,82], [230,275], "galacticgrunt",
-		doublePartner = TrainerData("Galacticf Halimede", "Mount Coronet - Room 1", 0xE0CB, BitNumber(3), [199,416,409], [217,217,230], "galacticgruntf")),
+	TrainerData("Galactic Ganymede", "Mount Coronet - Room 1", 0xE0CB, BitNumber(4), [208,328,82], [278,275,278], "galacticgrunt",
+		doublePartner = TrainerData("Galacticf Halimede", "Mount Coronet - Room 1", 0xE0CB, BitNumber(3), [199,416,409], [217,217,270], "galacticgruntf")),
 	TrainerData("Galacticf Squad Phobos", "Mount Coronet - Room 1", 0xE0CB, BitNumber(5), [330,337,430,332,452,472], [213,234,255,275,213,230], "galacticsquad"),
 	TrainerData("Galacticf Squad Deimos", "Mount Coronet - Room 1", 0xE0CC, BitNumber(5), [235,97,229,442,45,51], [275,157,253,157,221,275], "galacticsquad", optional = True),
 	TrainerData("Galacticf Despina", "Coronet Highlands - Outside 1", 0xE0C9, BitNumber(3), [203,78,277], [214,234,272], "galacticgruntf",
@@ -814,11 +839,11 @@ TRAINERLIST = [
 	TrainerData("Galactic Valetudo", "Coronet Highlands - Outside 1", 0xE0CA, BitNumber(0), [234,463,395,34,475], [234,272,234,281,234], "galacticgrunt"),
 	TrainerData("Galactic Cupid", "Coronet Highlands - Outside 1", 0xE0CA, BitNumber(1), [45,468,36], [234,234,158], "galacticgrunt", path = 1,
 		doublePartner = TrainerData("Galacticf Cressida", "Coronet Highlands - Outside 1", 0xE0C9, BitNumber(7), [474,131,217], [234,221,272], "galacticgruntf", path = 1)),
-	TrainerData("Galacticf Cordelia", "Coronet Highlands - Outside 1", 0xE0CA, BitNumber(2), [477,103,115,31,260,131], [234,270,234,281,265,265], "galacticgruntf", path = 2),
+	TrainerData("Galacticf Cordelia", "Coronet Highlands - Outside 1", 0xE0CA, BitNumber(2), [477,103,115,31,260,131], [234,270,234,281,234,265], "galacticgruntf", path = 2),
 	TrainerData("Galactic Puck", "Coronet Highlands - Outside 1", 0xE0CF, BitNumber(7), [173,220,94], [275,275,154], "galacticgrunt", optional = True),
 	TrainerData("Galactic Oberon", "Coronet Highlands - Outside 1", 0xDF4C, ExactNumber(3), [289,248,365,286,448,26], [214,234,217,213,270,191], "galacticgrunt",
-	    doublePartner = TrainerData("Galacticf Titania", "Coronet Highlands - Outside 1", 0xDF4C, ExactNumber(3), [468,334,178,189,251,469], [188,188,230,234,234,213], "galacticgruntf")),
-	TrainerData("Galactic Proteus", "Coronet Highlands - Room 1", 0xE0CA, BitNumber(3), [53,392,97,461,235], [154,157,154,213,230], "galacticgrunt"),
+		doublePartner = TrainerData("Galacticf Titania", "Coronet Highlands - Outside 1", 0xDF4C, ExactNumber(3), [468,334,178,189,251,469], [188,188,230,234,234,213], "galacticgruntf")),
+	TrainerData("Galactic Proteus", "Coronet Highlands - Room 1", 0xE0CA, BitNumber(3), [132,53,392,97,461,235], [154,157,154,213,230,217], "galacticgrunt"),
 	TrainerData("Galacticf Laomedeia", "Coronet Highlands - Room 1", 0xE0CA, BitNumber(4), [131,78,149], [0,0,0], "galacticgruntf", optional = True),
 	TrainerData("Galacticf Larissa", "Coronet Highlands - Room 1", 0xE0CA, BitNumber(6), [435,436,442,233,110], [255,234,213,234,193], "galacticgruntf"),
 	TrainerData("Galacticf Terra", "Coronet Highlands - Room 1", 0xDF4C, ExactNumber(4), [9,206,257,389,405,376], [186,265,270,208,270,213], "galacticgruntf",
@@ -827,7 +852,7 @@ TRAINERLIST = [
 	TrainerData("Galactic Pluto", "Coronet Highlands - Outside 2", 0xE0CB, BitNumber(0), [302,461,121,208,85,171], [234,270,265,217,272,234], "galacticgrunt"),
 	TrainerData("Galactic Prospero", "Coronet Highlands - Outside 2", 0xE0CB, BitNumber(6), [36,65,206,254,351,38], [234,270,234,234,157,270], "galacticgrunt"),
 	TrainerData("Galactic Squad Amalthia", "Coronet Highlands - Outside 2", 0xE0CC, BitNumber(6), [373,128,59,18,24], [188,214,270,270,213], "galacticsquad", path = 1),
-	TrainerData("Galacticf Miranda", "Coronet Highlands - Outside 2", 0xE0CB, BitNumber(2), [242,362,473,101], [234,210,270,270], "galacticgruntf", path = 2),
+	TrainerData("Galacticf Miranda", "Coronet Highlands - Outside 2", 0xE0CB, BitNumber(2), [242,362,473,143,101], [234,210,270,270,270], "galacticgruntf", path = 2),
 	TrainerData("Galacticf Angrboda", "Coronet Highlands - Outside 2", 0xE0DB, BitNumber(2), [40,442,80,132,286], [71,210,208,310,241], "galacticgruntf", path = 3),
 	TrainerData("Galacticf Ariel", "Coronet Highlands - Outside 2", 0xE0CB, BitNumber(1), [196,295,154], [234,234,234], "galacticgruntf"),
 	TrainerData("Galacticf Umbriel", "Coronet Highlands - Outside 2", 0xE0CB, BitNumber(2), [197,164,124], [234,234,230], "galacticgruntf"),
@@ -861,7 +886,9 @@ TRAINERLIST = [
 	TrainerData("Idol Zoe", "Victory Road", 0xE0A7, BitNumber(4), [221,193,203,201,200,427], [213,213,213,213,213,262], "idol"),
 	TrainerData("Dragon Tamer Clinton", "Victory Road", 0xE0A6, BitNumber(7), [373,196,89,149,124,357], [188,196,234,205,275,255], "dragontamer"),
 	TrainerData("Sinister Hooded Figure", "Pokémon League", 0xE0DD, BitNumber(2), [208,233,68,321,354,378], [205,202,157,202,157,157], "sinister", optional = True),
-	TrainerData("Barry #6", "Pokémon League", 0xDF7E, ExactNumber(1), [289,398,466,424,254,392], [202,306,270,275,214,298], "barry"),
+	TrainerData("Barry #6 - Turtwig", "Pokémon League", 0xDF7E, ExactNumber(1), [289,398,466,424,254,392], [202,306,270,275,214,298], "barry", starter = TURTWIG),
+	TrainerData("Barry #6 - Chimchar", "Pokémon League", 0xDF7E, ExactNumber(1), [289,398,466,424,260,395], [202,306,270,275,187,299], "barry", starter = CHIMCHAR),
+	TrainerData("Barry #6 - Piplup", "Pokémon League", 0xDF7E, ExactNumber(1), [289,398,466,424,257,389], [202,306,270,275,268,301], "barry", starter = PIPLUP),
 	TrainerData("Elite Four Aaron (Permanent Rain)", "Aaron Room", 0xDFF6, BitNumber(0), [205,469,416,283,330,99], [158,195,270,275,188,157], "aaron"),
 	TrainerData("Elite Four Bertha (Permanent Sandstorm)", "Bertha Room", 0xDFF6, BitNumber(1), [213,473,389,445,464,142], [234,270,234,188,158,270], "bertha"),
 	TrainerData("Elite Four Flint", "Flint Room", 0xDFF6, BitNumber(2), [383,480,103,229,6,467], [203,269,157,270,195,249], "flint"),

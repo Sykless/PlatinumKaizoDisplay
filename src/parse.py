@@ -7,7 +7,7 @@ class PokemonData:
         self.status = int(status) if status is not None else None
 
     def __str__(self):
-        return self.pokedexId + " - " + self.itemId
+        return str(self.pokedexId) + " - " + str(self.itemId)
     
     def __repr__(self):
         return str(self)

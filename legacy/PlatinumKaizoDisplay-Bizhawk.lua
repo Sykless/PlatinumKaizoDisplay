@@ -304,6 +304,7 @@ function sendPokemonData()
         local PARTY_ADDRESS = BASE_ADDRESS + 0xD094
         local TRAINERS_START = BASE_ADDRESS + 0xD076
         local TRAINER_END = BASE_ADDRESS + 0xE1E0
+        local STARTER_ADDRESS = BASE_ADDRESS + 0xDE00
 
 		local i = 0
 
@@ -311,6 +312,8 @@ function sendPokemonData()
 		local alivePokemon = true
 
         local mon
+        local frames = "FRAMES|" .. emu.framecount()
+        local starterPokemon = "STARTER"
         local partyPokemon = "PARTY"
         local boxPokemon = "BOX"
         local deadPokemon = "DEAD"
@@ -405,6 +408,9 @@ function sendPokemonData()
 			defeatedTrainers = defeatedTrainers .. "|" .. memory.read_u8(trainerAddress)
 		end
 
+        -- Retrieve picked starter for rival team
+        starterPokemon = starterPokemon .. "|" .. memory.read_u16_le(STARTER_ADDRESS)
+
 		-- Retrieve pokemonData.txt path from env variable defined by Python script
 		local dataFilePath = os.getenv("PLATINUMKAIZODISPLAY_DATAFILE")
 
@@ -413,7 +419,7 @@ function sendPokemonData()
 			local f = io.open(dataFilePath, "w")
 
 			if f then
-				f:write(partyPokemon .. "\n" .. boxPokemon .. "\n" .. deadPokemon .. "\n" .. defeatedTrainers .. "\n" .. trainerParty .. "\n" .. doubleTrainerParty)
+				f:write(frames .. "\n" .. starterPokemon .. "\n" .. partyPokemon .. "\n" .. boxPokemon .. "\n" .. deadPokemon .. "\n" .. trainerParty .. "\n" .. doubleTrainerParty .. "\n" .. defeatedTrainers)
 				f:close()
 			else
 				console.log("Cannot write pokemon data")

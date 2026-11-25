@@ -277,6 +277,7 @@ function sendPokemonData()
         local PARTY_ADDRESS = BASE_ADDRESS + 0xD094
         local TRAINERS_START = BASE_ADDRESS + 0xD076
         local TRAINER_END = BASE_ADDRESS + 0xE1E0
+        local STARTER_ADDRESS = BASE_ADDRESS + 0xDE00
 
 		local i = 0
 		local emptyBox = false
@@ -284,6 +285,8 @@ function sendPokemonData()
         local inBattle = false
 
         local mon
+        local frames = "FRAMES|" .. emu.framecount()
+        local starterPokemon = "STARTER"
         local partyPokemon = "PARTY"
         local boxPokemon = "BOX"
         local deadPokemon = "DEAD"
@@ -376,6 +379,9 @@ function sendPokemonData()
 			defeatedTrainers = defeatedTrainers .. "|" .. memory.readbyte(trainerAddress)
 		end
 
+        -- Retrieve picked starter for rival team
+        starterPokemon = starterPokemon .. "|" .. memory.readword(STARTER_ADDRESS)
+
         -----------------------
         -- TODO next updates --
         -----------------------
@@ -401,7 +407,7 @@ function sendPokemonData()
 			local f = io.open(dataFilePath, "w")
 
 			if f then
-				f:write(partyPokemon .. "\n" .. boxPokemon .. "\n" .. deadPokemon .. "\n" .. trainerParty .. "\n" .. doubleTrainerParty .. "\n" .. defeatedTrainers)
+				f:write(frames .. "\n" .. starterPokemon .. "\n" .. partyPokemon .. "\n" .. boxPokemon .. "\n" .. deadPokemon .. "\n" .. trainerParty .. "\n" .. doubleTrainerParty .. "\n" .. defeatedTrainers)
 				f:close()
 			else
 				displayBuffer:print("Cannot write pokemon data\n")

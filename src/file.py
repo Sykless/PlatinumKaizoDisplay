@@ -3,6 +3,8 @@ import sys
 import subprocess
 from pathlib import Path
 
+onImageReady = None # set by main.py
+
 # Find project root wether we're running the script as .py or .exe
 PROJECT_ROOT = (
     Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else
@@ -56,6 +58,10 @@ def safeWriteFile(image, fileName):
     tempOutputPath = os.path.join(TEMPOUTPUT_FOLDER, f"{fileName.lower()}.png")
     outputPath = os.path.join(OUTPUT_FOLDER, f"{fileName.lower()}.png")
     image.save(tempOutputPath, "PNG")
+
+    # Send a copy to the image to the interface
+    if onImageReady:
+        onImageReady(fileName, image.copy())
     image.close()
 
     # Swap temp image and output image
