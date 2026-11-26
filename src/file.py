@@ -15,6 +15,7 @@ TEMPOUTPUT_FOLDER = PROJECT_ROOT / ".tmp"
 OUTPUT_FOLDER = PROJECT_ROOT / "outputImage"
 VERSION_FILE = PROJECT_ROOT / "VERSION"
 CONF_FILE = PROJECT_ROOT / "configuration.txt"
+SETTINGS_FILE = PROJECT_ROOT / "settings.json"
 INPUT_FILE = PROJECT_ROOT / "pokemonData.txt"
 SPRITE_FOLDER = PROJECT_ROOT / "sprites"
 
@@ -71,6 +72,19 @@ def safeWriteFile(image, fileName):
     # PermissionError errors might occur because OBS is reading the image, don't print those
     except PermissionError:
         pass
+
+
+# Write text file safely even if half-written
+def safeWriteTextFile(textContent, filePath):
+    fileName = Path(filePath).name
+    tempPath = TEMPOUTPUT_FOLDER / f"{fileName}.tmp"
+
+    try:
+        with open(tempPath, "w", encoding = "utf-8") as f:
+            f.write(textContent)
+        os.replace(tempPath, filePath)
+    except OSError as error:
+        print(f"Could not write {fileName} : {error}")
 
 
 # Read configuration.txt and convert user preferences into boolean

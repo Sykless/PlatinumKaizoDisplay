@@ -1,8 +1,9 @@
 from PIL import Image
 
-import conf
 import file
+from file import BACKGROUNDPRITE_FOLDER
 from parse import PokemonData
+from settings import SETTINGS, PARTY, BOX, DEAD
 
 POKEMON_SPRITE_WIDTH = 80
 POKEMON_SPRITE_HEIGHT = 60
@@ -24,7 +25,27 @@ def generatePlayerPartyImage(label, pokemonList: list[PokemonData | None], colum
     # Initialise transparent image
     imageWidth = POKEMON_SPRITE_WIDTH * columnNumber + SPACING_X * (columnNumber - 1)
     imageHeight = POKEMON_SPRITE_HEIGHT * rowNumber + SPACING_Y * (rowNumber - 1)
-    outputImage = Image.new("RGBA", (imageWidth, imageHeight), (0,0,0,0))
+
+    # Custom box background is enabled
+    if (label == BOX and SETTINGS.isBoxBackgroundDisplayed() or label == DEAD and SETTINGS.isDeadBackgroundDisplayed()):
+        backgroundImagePath = BACKGROUNDPRITE_FOLDER / f"{label}.png"
+
+        # Cannot find background : set background transparent
+        if not backgroundImagePath.exists():
+            outputImage = Image.new("RGBA", (imageWidth, imageHeight), (0,0,0,0))
+
+        else:
+            # Retrieve custom background and set it as background of outputImage
+            backgroundImage = Image.open(backgroundImagePath).convert("RGBA").resize((imageWidth, imageHeight), Image.NEAREST)
+            outputImage = backgroundImage.copy()
+
+    # Transparent background
+    else:
+        outputImage = Image.new("RGBA", (imageWidth, imageHeight), (0,0,0,0))
+
+    # Display iteps if enabled in options
+    displayItems = (label == PARTY and SETTINGS.isPartyItemSpriteDisplayed()
+        or label == BOX and SETTINGS.isBoxItemSpriteDisplayed())
 
     # Iterate on each non-None Pokémon
     for i, pokemonData in enumerate(pokemonList):
@@ -43,7 +64,7 @@ def generatePlayerPartyImage(label, pokemonList: list[PokemonData | None], colum
         outputImage.paste(pokemonSprite, (x, y), pokemonSprite)
 
         # Display held item
-        if (conf.isItemSpriteDisplayed() and pokemonData.itemId):
+        if (displayItems and pokemonData.itemId):
 
             # Retrieve and display item sprite
             itemSpritePath = file.getItemSprite(pokemonData.itemId)

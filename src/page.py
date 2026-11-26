@@ -42,17 +42,17 @@ FONT = "Segoe UI"
 # PAGE COMPONENT
 # ======================================================
 class InterfacePage:
-    def __init__(self, parent, name, sections = None, checkboxes = None, settings = None, optionals = None):
+    def __init__(self, parent, name, sections = None, checkboxes = None, textboxes = None, optionals = None, settings = None):
         self.parent = parent
         self.name = name
 
         # Top area is split into sections, most pages only have one
-        self.sections = sections or {name: {"title": None, "checkboxes": checkboxes or [], "settings": settings or {}}}
+        self.sections = sections or {name: {"title": None, "checkboxes": checkboxes or {}, "optionals": optionals or {}, "textboxes": textboxes or {}}}
+        self.settings = settings or {"sections": {}}
         self.defaultSection = next(iter(self.sections))
 
-        self.optionals = optionals or [] # Limited to Trainer, don't have to put it in a section
         self.checkboxValues = {section: {} for section in self.sections}
-        self.settingsValues = {section: {} for section in self.sections}
+        self.textboxesValues = {section: {} for section in self.sections}
         self.optionalValues = {}
         
         self.outputImages = {}
@@ -118,7 +118,8 @@ class InterfacePage:
             self.optionalsFrame = tk.Frame(self.optionsSection, bg = SECTION_COLOR)
             self.createOptionsHeader()
             self.createOptionalsScrollArea()
-            self.createCheckboxes(self.optionalsFrame, self.name, self.optionals, self.optionalValues)
+            self.createCheckboxes(self.optionalsFrame, self.name, self.sections["Trainer"]["optionals"], self.optionalValues,
+                self.settings["sections"].get("Trainer", {}).get("optionals"))
             self.updateSelectAllLabel()
 
         self.createFooter()
@@ -699,11 +700,12 @@ class InterfacePage:
             frame.pack(fill = "x", padx = 24, pady = (12, 0))
             self.sectionFrames[section] = frame
 
-            self.createCheckboxes(frame, section, config["checkboxes"], self.checkboxValues[section])
-            self.createSettings(section)
+            self.createCheckboxes(frame, section, config["checkboxes"], self.checkboxValues[section],
+                self.settings["sections"].get(section, {}).get("checkboxes"))
+            self.createTextboxes(section)
 
 
-    def createCheckboxes(self, parent, section, options, variables):
+    def createCheckboxes(self, parent, section, options, variables, settings = {}):
 
         # Setup style for all checkboxes
         style = ttk.Style.get_instance()
@@ -716,11 +718,11 @@ class InterfacePage:
             parent.grid_columnconfigure(column, weight = 1, uniform = "optionColumns")
 
         # Display all options in checkboxes
-        for index, option in enumerate(options):
+        for index, (option, defaultValue) in enumerate(options.items()):
             row = index // OPTIONS_PER_ROW
             column = index % OPTIONS_PER_ROW
 
-            optionValue = tk.BooleanVar(value = False)
+            optionValue = tk.BooleanVar(value = settings.get(option, defaultValue))
             checkbox = ttk.Checkbutton(parent, text = option, variable = optionValue,
                 style = "TCheckbutton", cursor = "hand2", command = lambda: self.onCheckboxChanged(section))
             checkbox.grid(row = row, column = column, sticky = "w", padx = (0, 8), pady = 4)
@@ -753,45 +755,42 @@ class InterfacePage:
 
         self.onValueChanged(section)
 
-    def getSelectedCheckboxes(self, section = None):
-        variables = self.checkboxValues[section or self.defaultSection]
-        return [option for option, variable in variables.items() if variable.get()]
-
 
     # --------------------------------------------------
-    # SETTINGS (Label + Textbox)
+    # TEXTBOXES (Label + Field)
     # --------------------------------------------------
-    def createSettings(self, section):
+    def createTextboxes(self, section):
         config = self.sections[section]
-        if not config["settings"]:
+        if not config["textboxes"]:
             return
 
-        # Add settings after checkboxes
-        settingsFrame = self.sectionFrames[section]
+        # Add textboxes after checkboxes
+        textboxesFrame = self.sectionFrames[section]
         validate = (self.frame.register(self.isValidNumber), "%P")
 
-        for index, (name, defaultValue) in enumerate(config["settings"].items()):
+        for index, (name, defaultValue) in enumerate(config["textboxes"].items()):
             position = len(config["checkboxes"]) + index
             row = position // OPTIONS_PER_ROW
             column = position % OPTIONS_PER_ROW
 
-            settingsCell = tk.Frame(settingsFrame, bg = SECTION_COLOR)
-            settingsCell.grid(row = row, column = column, sticky = "w", padx = (0, 8), pady = 4)
+            textboxesCell = tk.Frame(textboxesFrame, bg = SECTION_COLOR)
+            textboxesCell.grid(row = row, column = column, sticky = "w", padx = (0, 8), pady = 4)
 
-            settingsLabel = tk.Label(settingsCell, text = name, font = (FONT, 10),
+            textboxesLabel = tk.Label(textboxesCell, text = name, font = (FONT, 10),
                 bg = SECTION_COLOR, fg = "#E5E7EB", padx = 6, pady = 6)
-            settingsLabel.pack(side = "left")
+            textboxesLabel.pack(side = "left")
 
-            value = tk.StringVar(value = str(defaultValue))
+            savedValues = self.settings["sections"].get(section, {}).get("textboxes", {})
+            value = tk.StringVar(value = str(savedValues.get(name, defaultValue)))
             value.trace_add("write", lambda *args: self.onValueChanged(section))
 
-            entry = tk.Entry(settingsCell, textvariable = value, width = 4, justify = "center",
+            entry = tk.Entry(textboxesCell, textvariable = value, width = 4, justify = "center",
                 font = (FONT, 10), bg = BUTTON_COLOR, fg = TEXT_COLOR, insertbackground = TEXT_COLOR,
                 relief = "flat", highlightthickness = 1, highlightbackground = "#343A43",
                 highlightcolor = ACCENT_COLOR, validate = "key", validatecommand = validate)
             entry.pack(side = "left", ipady = 3)
 
-            self.settingsValues[section][name] = value
+            self.textboxesValues[section][name] = value
 
     def isValidNumber(self, newText):
         return newText == "" or newText.isdigit()
@@ -799,15 +798,27 @@ class InterfacePage:
     def onValueChanged(self, section):
         if self.onChange: self.onChange(section)
 
-    def getSettingsValues(self, section = None):
+    def getTextboxesValues(self, section = None):
         section = section or self.defaultSection
         values = {}
 
-        for name, variable in self.settingsValues.items():
+        for name, variable in self.textboxesValues[section].items():
             text = variable.get()
-            values[name] = int(text) if text else self.sections[section]["values"][name]
+            values[name] = int(text) if text else self.sections[section]["textboxes"][name]
 
         return values
+
+    def getPageSettings(self):
+        return {
+            "sections": {
+                section: {
+                    "checkboxes": {option: variable.get() for option, variable in self.checkboxValues[section].items()},
+                    "optionals": {option: variable.get() for option, variable in self.optionalValues.items()} if section == "Trainer" else {},
+                    "textboxes": self.getTextboxesValues(section)
+                }
+                for section in self.sections
+            }
+        }
 
 
     # --------------------------------------------------

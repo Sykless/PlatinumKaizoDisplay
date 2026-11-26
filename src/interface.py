@@ -34,13 +34,15 @@ FONT = "Segoe UI"
 # MAIN APPLICATION
 # ======================================================
 class MainInterface:
-    def __init__(self, pages):
+    def __init__(self, pages, settings):
         self.pages: Dict[str, InterfacePage] = {}
         self.currentPage = None
+        self.settings = settings
 
         # Overriden methodes
         self.onTrainerPreview = None
         self.handleOptionsChanged = None
+        self.onSettingsChanged = None
 
         # Init Window
         self.setupWindowsDpi()
@@ -170,9 +172,11 @@ class MainInterface:
         for pageName, config in pageConfigs.items():
             page = InterfacePage(parent = self.pageContainer, name = pageName, sections = config.get("sections"),
                 checkboxes = config.get("checkboxes"),
-                settings = config.get("settings"),
-                optionals = config.get("optionals"))
-            
+                textboxes = config.get("textboxes"),
+                optionals = config.get("optionals"),
+                settings = self.settings.get(pageName))
+
+            page.onChange = lambda section, name = pageName, page = page: self.saveSettings(name, section, page)
             page.frame.grid(row = 0, column = 0, sticky = "nsew")
             self.pages[pageName] = page
 
@@ -294,13 +298,9 @@ class MainInterface:
         if page:
             page.updateImage(generatedImage, section)
 
-    def getSelectedCheckboxes(self, sectionName):
+    def getTextboxesValues(self, sectionName):
         page, section = self.findPage(sectionName)
-        return page.getSelectedCheckboxes(section) if page else []
-
-    def getSettingsValues(self, sectionName):
-        page, section = self.findPage(sectionName)
-        return page.getSettingsValues(section) if page else {}
+        return page.getTextboxesValues(section) if page else {}
 
     def setTrainers(self, trainerList):
         self.pages["Trainer"].setTrainers(trainerList)
@@ -310,6 +310,14 @@ class MainInterface:
 
     def getPinnedTrainer(self):
         return self.pages["Trainer"].pinnedTrainer
+
+
+    # --------------------------------------------------
+    # SETTINGS
+    # --------------------------------------------------
+    def saveSettings(self, pageName, section, page):
+        if self.onSettingsChanged:
+            self.onSettingsChanged(pageName, section, page.getPageSettings())
 
 
     # --------------------------------------------------

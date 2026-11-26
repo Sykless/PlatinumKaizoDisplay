@@ -3,6 +3,7 @@
 .vscode/
 outputImage/
 pokemonData.txt
+settings.json
 
 *.toc
 *.zip

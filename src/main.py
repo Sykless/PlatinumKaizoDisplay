@@ -1,46 +1,10 @@
-import time
-
 import conf
 import file
 import parse
 import party
 import trainer
+from settings import SETTINGS, DEFAULT_SETTINGS, PARTY, BOX, DEAD, TRAINER
 from interface import MainInterface, LUA_CHECKING, LUA_RUNNING, LUA_STOPPED
-
-PARTY_LABEL = "party"
-BOX_LABEL = "box"
-DEAD_LABEL = "dead"
-
-INTERFACES_PAGES = {
-    "Trainer": {
-        "checkboxes": ["Show Held Items", "Show Background"],
-        "optionals": [
-            "Route 206", "Hearthome Gym", "Route 209", "Route 210 South",
-            "Café", "Route 215", "Route 213", "Clamberclaw Cliffs",
-            "Snowpoint Gym", "Route 222", "Oreburgh Gate", "Route 217",
-            "Fuego Ironworks", "Route 216", "Route 212", "Route 220",
-            "Route 221", "Wayward Cave", "Veilstone Warehouse", "Galactic HQ",
-            "Mount Coronet - Room 1", "Coronet Highlands - Outside 1", "Route 223", "Pokémon League"]
-    },
-    "Boxes": {
-        "sections": {
-            "Box": {
-                "title": "Available Pokémon",
-                "checkboxes": ["Show Held Items", "Show Multiple Boxes"],
-                "settings": {"Display Time": 5}
-            },
-            "Dead": {
-                "title": "Dead Pokémon", 
-                "checkboxes": [],
-                "settings": {"Columns": 6, "Rows": 5}
-            }
-        }
-    },
-    "Party": {
-        "checkboxes": ["Show Held Items", "Show Status", "Show HP"]
-    },
-    "Logs": {}
-}
 
 class PlatinumKaizoDisplay:
     def __init__(self):
@@ -54,9 +18,10 @@ class PlatinumKaizoDisplay:
         self.luaStopped = 0
         self.currentTrainer = None
 
-        self.interface = MainInterface(pages = INTERFACES_PAGES)
+        self.interface = MainInterface(pages = DEFAULT_SETTINGS, settings = SETTINGS.currentSettings)
         self.interface.onTrainerPreview = trainer.generateTrainerCard
         self.interface.handleOptionsChanged = self.refreshImage
+        self.interface.onSettingsChanged = self.quickRefresh
         self.interface.setLuaStatus(LUA_CHECKING)
         file.onImageReady = self.interface.updatePageImage
 
@@ -77,27 +42,37 @@ class PlatinumKaizoDisplay:
         if (dataRead):
             self.lastValidData = dataRead
 
+            # Refresh settings
+            SETTINGS.loadSettings()
+
             # Generate party, box, dead and trainer images
-            self.refreshImage("Party")
-            self.refreshImage("Box")
-            self.refreshImage("Dead")
-            self.refreshImage("Trainer")
+            self.refreshImage(PARTY)
+            self.refreshImage(BOX)
+            self.refreshImage(DEAD)
+            self.refreshImage(TRAINER)
 
         self.clock += 1
         self.interface.root.after(1000, self.mainLoop)
 
 
+    # Refresh settings and generate an image on the fly
+    def quickRefresh(self, pageName, image, newValues):
+        SETTINGS.updatePageSettings(pageName, newValues)
+        SETTINGS.loadSettings()
+        self.refreshImage(image)
+
+
     # Generates image based on argument
     def refreshImage(self, image):
-        if (image == "Trainer"):
+        if (image == TRAINER):
             self.refreshTrainerImage()
-        if (image == "Party"):
-            party.generatePlayerPartyImage(PARTY_LABEL, self.partyLine, 6, 1)
-        if (image == "Box"):
-            party.generatePlayerPartyImage(BOX_LABEL, self.boxLine, 6, 5)
-        if (image == "Dead"):
-            columnNumber, rowNumber = conf.deadBoxSize()
-            party.generatePlayerPartyImage(DEAD_LABEL, self.deadLine, columnNumber, rowNumber, customSize = True)
+        if (image == PARTY):
+            party.generatePlayerPartyImage(PARTY, self.partyLine, 6, 1)
+        if (image == BOX):
+            party.generatePlayerPartyImage(BOX, self.boxLine, 6, 5)
+        if (image == DEAD):
+            columnNumber, rowNumber = SETTINGS.deadBoxSize()
+            party.generatePlayerPartyImage(DEAD, self.deadLine, columnNumber, rowNumber, customSize = True)
 
 
     # Display trainer image from retrieved emulator data
@@ -131,7 +106,7 @@ class PlatinumKaizoDisplay:
 
         # Save trainer image in output folder
         if (trainerOutputImage):
-            file.safeWriteFile(trainerOutputImage, "trainer")
+            file.safeWriteFile(trainerOutputImage, TRAINER)
 
         self.interface.setTrainers(trainer.getTrainerList())
         self.interface.setLiveTrainer(self.nextTrainer)
@@ -145,8 +120,8 @@ class PlatinumKaizoDisplay:
             lines = emulatorData.splitlines()
 
             # Retrieve conf file content to check user preferences
-            displayMultipleBoxes = conf.isDisplayMultipleBoxes()
-            boxDisplayTime = conf.getBoxDisplayTime()
+            displayMultipleBoxes = SETTINGS.isDisplayMultipleBoxes()
+            boxDisplayTime = SETTINGS.getBoxDisplayTime()
 
             # Retrieve each line and parse its data
             for line in lines:
@@ -208,5 +183,5 @@ if __name__ == "__main__":
         app.run()
         
     # Don't stop script if an error occurs, just print it in the logs
-    except Exception as e:
+    except EncodingWarning as e:
         print("An error occurred : ", e)

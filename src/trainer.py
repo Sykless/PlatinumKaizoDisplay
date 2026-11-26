@@ -2,9 +2,9 @@ import os
 import copy
 from PIL import Image, ImageEnhance
 
-import file
 import conf
 from parse import PokemonData
+from settings import SETTINGS
 
 TRAINERS_START = 0xD076
 TRAINER_END = 0xE1E0
@@ -68,7 +68,7 @@ class TrainerData:
 		self.trainerId = -1
 
 		# Optional attributes
-		self.optional = optional # Only taken into account if set in conf.json 
+		self.optional = optional # Only taken into account if set in options
 		self.boss = boss # Set all trainers in its zone to defeated if beaten
 		self.superboss = superboss # Never included in all processes, just there in case we choose to fight them
 		self.path = path # Part of a path that can be taken or skipped for an alternative path
@@ -280,7 +280,7 @@ def generateTrainerCard(trainer: TrainerData, trainerParty: list[PokemonData] = 
 	TRAINER_ITEMS_SPRITE_SIZE = itemSizeMultiplier * ITEM_SPRITE_SIZE
 
 	# Custom trainer background is enabled
-	if (conf.isTrainerBackgroundDisplayed()):
+	if (SETTINGS.isTrainerBackgroundDisplayed()):
 		backgroundImagePath = os.path.join(BACKGROUNDPRITE_FOLDER, f"{trainer.zone}.png")
 
 		# Cannot find background : set background transparent
@@ -348,7 +348,7 @@ def generateTrainerCard(trainer: TrainerData, trainerParty: list[PokemonData] = 
 			pokemonSprites[i] = ImageEnhance.Brightness(pokemonSprites[i]).enhance(0.3 if pokemonKo else 1)
 
 		# Retrieve item sprite from itemId and display it
-		if (itemId and conf.isTrainerItemSpriteDisplayed()):
+		if (itemId and SETTINGS.isTrainerItemSpriteDisplayed()):
 			itemSpritePath = os.path.join(ITEMSPRITE_FOLDER, f"{itemId}.png")
 			if not os.path.exists(itemSpritePath):
 				itemSpritePath = os.path.join(ITEMSPRITE_FOLDER, "0.png")
