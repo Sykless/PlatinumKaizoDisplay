@@ -746,6 +746,7 @@ class InterfacePage:
 
     def onCheckboxChanged(self, section = None):
         section = section or self.defaultSection
+        self.onValueChanged(section)
 
         if self.name == "Trainer":
             self.updateSelectAllLabel()
@@ -753,7 +754,7 @@ class InterfacePage:
             if self.previewTrainer:
                 self.refreshTrainerView()
 
-        self.onValueChanged(section)
+        
 
 
     # --------------------------------------------------
