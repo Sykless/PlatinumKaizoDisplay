@@ -5,6 +5,8 @@ import file
 from file import SETTINGS_FILE
 
 SHOW_HELD_ITEMS = "Show Held Items"
+SHOW_STATUS = "Show Status"
+SHOW_HP = "Show HP"
 SHOW_BACKGROUND = "Show Background"
 SHOW_MULTIPLE_BOXES = "Show Multiple Boxes"
 DISPLAY_TIME = "Display Time (s)"
@@ -43,7 +45,7 @@ DEFAULT_SETTINGS = {
         }
     },
     PARTY: {
-        "checkboxes": {SHOW_HELD_ITEMS: True, "Show Status": True, "Show HP": True}
+        "checkboxes": {SHOW_HELD_ITEMS: True, SHOW_STATUS: True, SHOW_HP: True}
     },
     "Logs": {}
 }
@@ -172,22 +174,28 @@ class Settings:
                     return optionValue
 
     def isPartyItemSpriteDisplayed(self):
-        return self.getOption(TRAINER, SHOW_HELD_ITEMS)
+        return self.getOption(PARTY, SHOW_HELD_ITEMS)
 
-    def isBoxItemSpriteDisplayed(self):
-        return self.getOption(BOX, SHOW_HELD_ITEMS)
+    def isPartyStatusDisplayed(self):
+        return self.getOption(PARTY, SHOW_STATUS)
+
+    def isPartyHealthDisplayed(self):
+        return self.getOption(PARTY, SHOW_HP)
 
     def isTrainerItemSpriteDisplayed(self):
         return self.getOption(TRAINER, SHOW_HELD_ITEMS)
 
-    def isBoxBackgroundDisplayed(self):
-        return self.getOption(BOX, SHOW_BACKGROUND)
+    def isTrainerBackgroundDisplayed(self):
+        return self.getOption(TRAINER, SHOW_BACKGROUND)
 
     def isDeadBackgroundDisplayed(self):
         return self.getOption(DEAD, SHOW_BACKGROUND)
 
-    def isTrainerBackgroundDisplayed(self):
-        return self.getOption(TRAINER, SHOW_BACKGROUND)
+    def isBoxItemSpriteDisplayed(self):
+        return self.getOption(BOX, SHOW_HELD_ITEMS)
+
+    def isBoxBackgroundDisplayed(self):
+        return self.getOption(BOX, SHOW_BACKGROUND)
 
     def isDisplayMultipleBoxes(self):
         return self.getOption(BOX, SHOW_MULTIPLE_BOXES)
