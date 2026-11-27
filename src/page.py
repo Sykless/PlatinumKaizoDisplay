@@ -314,12 +314,12 @@ class InterfacePage:
 
         # First trainer or superboss, disable left arrow
         if (direction == -1 and currentTrainer.trainerId not in [-1,0]):
-            newTrainer = self.trainerList[currentTrainer.trainerId - 1]
+            newTrainer = next((trainer for trainer in reversed(self.trainerList[:currentTrainer.trainerId]) if not trainer.defeated), self.trainerList[0])
 
         # Last trainer or superboss, disable right arrow
         if (direction == 1 and currentTrainer.trainerId not in [-1, len(self.trainerList) - 1]):
-            newTrainer = self.trainerList[currentTrainer.trainerId + 1]
-
+            newTrainer = next((trainer for trainer in self.trainerList[currentTrainer.trainerId + 1:] if not trainer.defeated), self.trainerList[-1])
+            
         # Back on the live trainer : nothing to preview anymore
         self.previewTrainer = None if newTrainer == self.getDisplayedTrainer() else newTrainer
         self.refreshTrainerView()
@@ -376,20 +376,22 @@ class InterfacePage:
         if not self.trainerList or not currentTrainer:
             return
 
-        # First trainer or superboss, disable left arrow
-        if (currentTrainer.trainerId in [-1,0]):
+        # Find previous and next first non-defeated trainer
+        previousTrainer = next((trainer for trainer in reversed(self.trainerList[:currentTrainer.trainerId]) if not trainer.defeated), None)
+        nextTrainer = next((trainer for trainer in self.trainerList[currentTrainer.trainerId + 1:] if not trainer.defeated), None)
+
+        # Superboss or no previous non-defeated trainer, disable left arrow
+        if (currentTrainer.trainerId == -1 or not previousTrainer):
             self.disableLeftArrow()
         else:
             self.enableLeftArrow()
-            previousTrainer = self.trainerList[currentTrainer.trainerId - 1]
             self.previousSprite.config(image = self.getTrainerSprite(previousTrainer.spriteName) or "")
 
         # Last trainer or superboss, disable right arrow
-        if (currentTrainer.trainerId in [-1, len(self.trainerList) - 1]):
+        if (currentTrainer.trainerId == -1 or not nextTrainer):
             self.disableRightArrow()
         else:
             self.enableRightArrow()
-            nextTrainer = self.trainerList[currentTrainer.trainerId + 1]
             self.nextSprite.config(image = self.getTrainerSprite(nextTrainer.spriteName) or "")
 
 
@@ -434,7 +436,7 @@ class InterfacePage:
             text = f"● Pinned : {self.pinnedTrainer.getCompleteName()}"
             color = STATUS_RUNNING
         elif self.liveTrainer:
-            text = f"● Live : {self.liveTrainer.getCompleteName()}"
+            text = f"● Next Trainer : {self.liveTrainer.getCompleteName()}"
             color = STATUS_RUNNING
 
         self.trainerStatus.config(text = text, fg = color)
@@ -601,7 +603,7 @@ class InterfacePage:
             bg = SECTION_COLOR, fg = TEXT_COLOR, cursor = "hand2")
         self.toggleArrow.pack(side = "left", padx = (0, 10))
 
-        self.titleLabel = tk.Label(headerFrame, text = "Display Optional Trainers", font = (FONT, 12, "bold"),
+        self.titleLabel = tk.Label(headerFrame, text = "Allow Optional Trainers", font = (FONT, 12, "bold"),
             bg = SECTION_COLOR, fg = TEXT_COLOR, cursor = "hand2")
         self.titleLabel.pack(side = "left")
 

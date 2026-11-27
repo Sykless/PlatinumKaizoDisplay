@@ -86,7 +86,7 @@ class TrainerData:
 		return self.name + ((" + " + self.doublePartner.name) if self.doublePartner else "")
 
 	def __str__(self):
-		return f'TrainerData("{self.name}", {self.address:#010X}, {self.bitNumber.value}, [{",".join(str(pokedexId) for pokedexId in self.pokemonTeam)}], "{self.spriteName}", defeated = "{self.defeated}", skipped = "{self.skipped}")'
+		return f'TrainerData("{self.name}", {self.address:#010X}, {self.bitNumber.value}, [{",".join(str(pokedexId) for pokedexId in self.pokemonTeam)}], defeated = "{self.defeated}", skipped = "{self.skipped}", trainerId = {self.trainerId})'
 
 	def __eq__(self, trainer):
 		if not isinstance(trainer, TrainerData):
@@ -98,7 +98,7 @@ class TrainerData:
 # Dynamic Trainer list shared between files
 # --------------------------------------------------
 TRAINERLIST = [] # Populated all the way down below
-trainerList = []
+trainerList: list[TrainerData] = []
 
 # Retrieve editable trainer list taking rival potential team into account
 def refreshTrainerList(pickedStarter, defeatedTrainers):
@@ -148,6 +148,7 @@ def refreshTrainerList(pickedStarter, defeatedTrainers):
 
 			while (trainerList[trainerId].zone in clearedZones):
 				trainerList[trainerId].defeated = True
+				trainerList[trainerId].trainerId = trainerId
 				trainerId -= 1
 			trainerId += 1 # Keep end-of-loop logic consistent
 
@@ -231,6 +232,9 @@ def getNextTrainer(currentPathTrainerId):
 	veryNextTrainerId = -1
 	nextTrainerId = 0
 
+	# Retrieve ticked zones to take optional trainers into account
+	optionalsZones = SETTINGS.getOptionalsZones()
+
 	# Currently in an unfinished path : start from there
 	if (currentPathTrainerId):
 		veryNextTrainerId = currentPathTrainerId
@@ -245,7 +249,7 @@ def getNextTrainer(currentPathTrainerId):
 
 		# Trainer not defeated
 		else:
-			if (trainer.optional or trainer.skipped):
+			if (trainer.optional and not optionalsZones.get(trainer.zone, False) or trainer.skipped):
 				continue
 
 			if (veryNextTrainerId < 0):

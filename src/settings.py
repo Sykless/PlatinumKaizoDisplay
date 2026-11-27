@@ -219,6 +219,9 @@ class Settings:
         columnNumber, rowNumber = self.getOption(DEAD, COLUMNS), self.getOption(DEAD, ROWS)
         return (columnNumber, rowNumber) if columnNumber * rowNumber else (6,5)
 
+    def getOptionalsZones(self):
+        return self.currentSettings[TRAINER]["sections"][TRAINER]["optionals"]
+
 
 # Global settings object, updated by interface and read by image generator
 SETTINGS = Settings()
