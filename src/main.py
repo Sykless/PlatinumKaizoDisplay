@@ -1,4 +1,5 @@
-import conf
+import traceback
+
 import file
 import parse
 import party
@@ -31,9 +32,24 @@ class PlatinumKaizoDisplay:
         self.interface.root.after(0, self.mainLoop)
         self.interface.run()
 
-
-    # Self-call itself every second
+    # Main loop, handles exception and self-call infinite loop
     def mainLoop(self):
+        try:
+            self.updateImages()
+
+        # Show errors in Logs page and continue
+        except Exception:
+            print("An error occurred :")
+            traceback.print_exc()
+            print("\n")
+
+        # Self-call itself every second
+        finally:
+            self.interface.root.after(1000, self.mainLoop)
+
+
+    # Read emulator data and updates images
+    def updateImages(self):
         
         # Read emulator data from Lua script
         dataRead = self.readEmulatorData()
@@ -52,7 +68,6 @@ class PlatinumKaizoDisplay:
             self.refreshImage(TRAINER)
 
         self.clock += 1
-        self.interface.root.after(1000, self.mainLoop)
 
 
     # Refresh settings and generate an image on the fly
@@ -183,5 +198,5 @@ if __name__ == "__main__":
         app.run()
         
     # Don't stop script if an error occurs, just print it in the logs
-    except EncodingWarning as e:
+    except Exception as e:
         print("An error occurred : ", e)

@@ -38,10 +38,6 @@ def ensureSetup():
     TEMPOUTPUT_FOLDER.mkdir(exist_ok = True)
     subprocess.run(["attrib", "+h", str(TEMPOUTPUT_FOLDER)], check = True)
 
-    # Notify user when ready to use
-    print("\nPlatinum Kaizo Display version " + safeReadFile(VERSION_FILE) +  " currently running...")
-    print("Make sure PlatinumKaizoDisplay.lua script is also running !\n")
-
 
 # Read file safely even if used by lua script
 def safeReadFile(path):

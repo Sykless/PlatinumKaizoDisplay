@@ -4,7 +4,10 @@ from typing import Dict
 import ttkbootstrap as ttk
 from ctypes import wintypes
 
+import file
+from file import VERSION_FILE
 from page import InterfacePage
+from logs import LogCapture, LogsPage
 
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 850
@@ -44,6 +47,10 @@ class MainInterface:
         self.handleOptionsChanged = None
         self.onSettingsChanged = None
 
+        # Init logs page
+        self.logCapture = LogCapture()
+        self.logCapture.install()
+
         # Init Window
         self.setupWindowsDpi()
         self.root = ttk.Window(themename = "darkly")
@@ -57,6 +64,10 @@ class MainInterface:
 
         # Give focus to root when clicking away
         self.root.bind_all("<Button-1>", self.clearFocus, add = "+")
+
+        # Notify user when ready to use
+        print("Platinum Kaizo Display version " + file.safeReadFile(VERSION_FILE) +  " currently running...")
+        print("Make sure PlatinumKaizoDisplay.lua script is also running !\n")
         
 
     # ======================================================
@@ -170,13 +181,18 @@ class MainInterface:
 
         # Pre-load all pages and store them in a list
         for pageName, config in pageConfigs.items():
-            page = InterfacePage(parent = self.pageContainer, name = pageName, sections = config.get("sections"),
-                checkboxes = config.get("checkboxes"),
-                textboxes = config.get("textboxes"),
-                optionals = config.get("optionals"),
-                settings = self.settings.get(pageName))
+            if pageName == "Logs":
+                page = LogsPage(self.pageContainer, self.logCapture)
+            else:
+                page = InterfacePage(parent = self.pageContainer, name = pageName,
+                    sections = config.get("sections"),
+                    checkboxes = config.get("checkboxes"),
+                    textboxes = config.get("textboxes"),
+                    optionals = config.get("optionals"),
+                    settings = self.settings.get(pageName))
 
-            page.onChange = lambda section, name = pageName, page = page: self.saveSettings(name, section, page)
+                page.onChange = lambda section, name = pageName, page = page: self.saveSettings(name, section, page)
+                
             page.frame.grid(row = 0, column = 0, sticky = "nsew")
             self.pages[pageName] = page
 
@@ -324,4 +340,7 @@ class MainInterface:
     # RUN
     # --------------------------------------------------
     def run(self):
-        self.root.mainloop()
+        try:
+            self.root.mainloop()
+        finally:
+            self.logCapture.uninstall()
