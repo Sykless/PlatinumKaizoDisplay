@@ -10,6 +10,7 @@ SHOW_HP = "Show HP"
 SHOW_BACKGROUND = "Show Background"
 SHOW_MULTIPLE_BOXES = "Show Multiple Boxes"
 DISPLAY_TIME = "Display Time (s)"
+CUSTOM_SIZE = "Custom Size"
 COLUMNS = "Columns"
 ROWS = "Rows"
 
@@ -35,12 +36,18 @@ DEFAULT_SETTINGS = {
             BOX: {
                 "title": "Available Pokémon",
                 "checkboxes": {SHOW_HELD_ITEMS: True, SHOW_BACKGROUND: False, SHOW_MULTIPLE_BOXES: False},
-                "textboxes": {DISPLAY_TIME: 5}
+                "textboxes": {DISPLAY_TIME: 5},
+                "rules": {
+                    "enables": {SHOW_MULTIPLE_BOXES: [DISPLAY_TIME]}
+                }
             },
             DEAD: {
                 "title": "Dead Pokémon", 
-                "checkboxes": {SHOW_BACKGROUND: False},
-                "textboxes": {COLUMNS: 6, ROWS: 5}
+                "checkboxes": {SHOW_BACKGROUND: False, CUSTOM_SIZE: False},
+                "textboxes": {COLUMNS: 6, ROWS: 5},
+                "rules": {
+                    "enables": {CUSTOM_SIZE: [COLUMNS, ROWS]}
+                }
             }
         }
     },
@@ -204,7 +211,11 @@ class Settings:
         displayTime = self.getOption(BOX, DISPLAY_TIME)
         return displayTime if displayTime > 0 else 5
 
+    def isDeadBoxCustomSize(self):
+        return self.getOption(DEAD, CUSTOM_SIZE)
+
     def deadBoxSize(self):
+        if not self.isDeadBoxCustomSize(): return (6,5)
         columnNumber, rowNumber = self.getOption(DEAD, COLUMNS), self.getOption(DEAD, ROWS)
         return (columnNumber, rowNumber) if columnNumber * rowNumber else (6,5)
 

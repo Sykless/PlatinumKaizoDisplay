@@ -47,12 +47,13 @@ class InterfacePage:
         self.name = name
 
         # Top area is split into sections, most pages only have one
-        self.sections = sections or {name: {"title": None, "checkboxes": checkboxes or {}, "optionals": optionals or {}, "textboxes": textboxes or {}}}
+        self.sections = sections or {name: {"title": name, "checkboxes": checkboxes or {}, "optionals": optionals or {}, "textboxes": textboxes or {}}}
         self.settings = settings or {"sections": {}}
         self.defaultSection = next(iter(self.sections))
 
         self.checkboxValues = {section: {} for section in self.sections}
         self.textboxesValues = {section: {} for section in self.sections}
+        self.textboxWidgets = {section: {} for section in self.sections}
         self.optionalValues = {}
         
         self.outputImages = {}
@@ -95,10 +96,8 @@ class InterfacePage:
         if (self.name == "Trainer"):
             self.createTrainerNavigation()
             self.createTrainerBar()
-        elif len(self.sections) > 1:
-            self.createSectionTitles()
         else:
-            tk.Frame(self.frame, bg = BACKGROUND_COLOR, height = TRAINER_BAR_HEIGHT).pack(fill = "x")
+            self.createSectionTitles()
 
         # Separator between image and options
         separator = ttk.Separator(self.frame, bootstyle = "secondary")
@@ -467,7 +466,7 @@ class InterfacePage:
 
         for column, config in enumerate(self.sections.values()):
             sectionBar.grid_columnconfigure(column, weight = 1, uniform = "sectionColumns")
-            tk.Label(sectionBar, text = config["title"], font = (FONT, 11, "bold"),
+            tk.Label(sectionBar, text = f"Preview : {config["title"]}", font = (FONT, 11, "bold"),
                 bg = BACKGROUND_COLOR, fg = TEXT_COLOR).grid(row = 0, column = column)
 
 
@@ -691,10 +690,9 @@ class InterfacePage:
     def createSectionOptions(self):
         for section, config in self.sections.items():
 
-            # Title above each block, only if more than one section
-            if len(self.sections) > 1:
-                tk.Label(self.optionsSection, text = config["title"], font = (FONT, 12, "bold"),
-                    bg = SECTION_COLOR, fg = TEXT_COLOR).pack(anchor = "w", padx = 24, pady = (15, 0))
+            # Title above each block
+            tk.Label(self.optionsSection, text = f"{config["title"]} Settings", font = (FONT, 12, "bold"),
+                bg = SECTION_COLOR, fg = TEXT_COLOR).pack(anchor = "w", padx = 24, pady = (15, 0))
 
             frame = tk.Frame(self.optionsSection, bg = SECTION_COLOR)
             frame.pack(fill = "x", padx = 24, pady = (12, 0))
@@ -703,6 +701,7 @@ class InterfacePage:
             self.createCheckboxes(frame, section, config["checkboxes"], self.checkboxValues[section],
                 self.settings["sections"].get(section, {}).get("checkboxes"))
             self.createTextboxes(section)
+            self.applyRules(section)
 
 
     def createCheckboxes(self, parent, section, options, variables, settings = {}):
@@ -728,6 +727,28 @@ class InterfacePage:
             checkbox.grid(row = row, column = column, sticky = "w", padx = (0, 8), pady = 4)
             variables[option] = optionValue
 
+
+    # Apply texbox enable/disable rules in a section
+    def applyRules(self, section):
+        rules = self.sections.get(section, {}).get("rules", {})
+        optionValues = self.checkboxValues.get(section, {})
+
+        # A textbox is only editable while its checkbox is ticked
+        for checkbox, textboxes in rules.get("enables", {}).items():
+            enabled = optionValues[checkbox].get()
+
+            for name in textboxes:
+                label, entry = self.textboxWidgets[section][name]
+
+                if enabled:
+                    entry.config(state = "normal", cursor = "xterm")
+                    label.config(fg = "#E5E7EB", cursor = "")
+                else:
+                    entry.config(state = "disabled", cursor = "no")
+                    label.config(fg = "#5C626C", cursor = "no")
+
+
+    # Tick all optional checkboxes
     def toggleAllOptionals(self):
         allChecked = all(variable.get() for variable in self.optionalValues.values())
 
@@ -744,8 +765,13 @@ class InterfacePage:
         allChecked = all(variable.get() for variable in self.optionalValues.values())
         self.selectAllLabel.config(text = "Deselect all" if allChecked else "Select all")
 
+
+    # Called whenever a checkbox is ticked
     def onCheckboxChanged(self, section = None):
         section = section or self.defaultSection
+
+        # Apply textbox disable/enable rules, then apply value changed logic
+        self.applyRules(section)
         self.onValueChanged(section)
 
         if self.name == "Trainer":
@@ -787,11 +813,14 @@ class InterfacePage:
 
             entry = tk.Entry(textboxesCell, textvariable = value, width = 4, justify = "center",
                 font = (FONT, 10), bg = BUTTON_COLOR, fg = TEXT_COLOR, insertbackground = TEXT_COLOR,
+                disabledbackground = BUTTON_COLOR, disabledforeground = "#5C626C",
                 relief = "flat", highlightthickness = 1, highlightbackground = "#343A43",
                 highlightcolor = ACCENT_COLOR, validate = "key", validatecommand = validate)
             entry.pack(side = "left", ipady = 3)
 
+            # Save each text box to enable/disable them if linked checkbox is unticked
             self.textboxesValues[section][name] = value
+            self.textboxWidgets[section][name] = (textboxesLabel, entry)
 
     def isValidNumber(self, newText):
         return newText == "" or newText.isdigit()
